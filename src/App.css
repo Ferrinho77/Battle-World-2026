@@ -4165,3 +4165,193 @@ input::placeholder {
     padding: 12px;
   }
 }
+
+
+/* STEP 19B - professional league dashboard */
+.dashboard-hero-pro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, .75fr);
+  gap: 14px;
+  padding: 18px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 207, 94, .18), transparent 34%),
+    linear-gradient(135deg, rgba(88, 166, 255, .16), rgba(255,255,255,.045));
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 22px 50px rgba(0,0,0,.22);
+  margin-bottom: 14px;
+}
+
+.dashboard-hero-pro h3 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.dashboard-hero-pro p {
+  color: #d8e8ff;
+  font-weight: 800;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.dashboard-actions-pro {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.deadline-card-pro {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(6, 20, 38, .64);
+  border: 1px solid rgba(255, 207, 94, .22);
+}
+
+.deadline-card-pro span {
+  color: #ffcf5e;
+  font-weight: 950;
+  font-size: 13px;
+}
+
+.deadline-card-pro strong {
+  color: #fff;
+  font-size: 17px;
+}
+
+.deadline-card-pro small {
+  color: #9fb1c8;
+  font-weight: 800;
+}
+
+.league-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.league-stat-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(88,166,255,.16);
+  overflow: hidden;
+}
+
+.league-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: rgba(88,166,255,.16);
+  font-size: 22px;
+}
+
+.league-stat-card strong {
+  display: block;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.league-stat-card span {
+  display: block;
+  color: #b9c9df;
+  font-size: 12px;
+  font-weight: 900;
+  margin-top: 5px;
+}
+
+.mini-progress {
+  grid-column: 1 / -1;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  overflow: hidden;
+}
+
+.mini-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #18c964, #ffcf5e);
+}
+
+.top-five-list {
+  display: grid;
+  gap: 8px;
+}
+
+.top-five-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.top-five-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-five-row em {
+  color: #ffcf5e;
+  font-style: normal;
+  font-weight: 950;
+}
+
+@media (max-width: 760px) {
+  .dashboard-hero-pro {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .dashboard-actions-pro .btn {
+    flex: 1 1 140px;
+  }
+
+  .league-status-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .league-stat-card {
+    grid-template-columns: 36px 1fr;
+    padding: 11px;
+  }
+
+  .league-stat-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    border-radius: 12px;
+  }
+
+  .league-stat-card strong {
+    font-size: 18px;
+  }
+
+  .league-stat-card span {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 420px) {
+  .league-status-grid {
+    grid-template-columns: 1fr;
+  }
+}

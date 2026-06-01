@@ -1720,8 +1720,89 @@ function getPredictionLockText(match) {
     );
   }
 
+
+  function getCompletedUserCountFromRows(rows, predicate) {
+    const names = new Set();
+    rows.forEach((row) => {
+      if (predicate(row)) names.add(row.username || row.user_email || "User");
+    });
+    return names.size;
+  }
+
+  function getLeagueDashboardStats(rankingRows = []) {
+    const totalParticipants = getPlayersInLeague().length;
+
+    const matchRows = uniquePredictions().filter((p) => !isTopScorerPrediction(p.match_id));
+    const matchPredUsers = getCompletedUserCountFromRows(matchRows, (p) =>
+      p.home_score !== undefined && p.home_score !== "" &&
+      p.away_score !== undefined && p.away_score !== ""
+    );
+
+    const topScorerUsers = getCompletedUserCountFromRows(allTopScorerPredictions, (p) => !!p.player);
+
+    const qualifiedUsers = getCompletedUserCountFromRows(allBonusPredictions, (p) =>
+      p.prediction_type === "qualification"
+    );
+
+    const groupRankingUsers = getCompletedUserCountFromRows(allBonusPredictions, (p) =>
+      p.prediction_type === "group_position"
+    );
+
+    return {
+      totalParticipants,
+      matchPredUsers,
+      topScorerUsers,
+      qualifiedUsers,
+      groupRankingUsers,
+      topFive: rankingRows.slice(0, 5),
+    };
+  }
+
+  function getNextDeadlineInfo(nextMatch, tournamentStart) {
+    const mode = leagueSettings.prediction_lock_mode || "match";
+
+    if (mode === "tournament") {
+      return {
+        title: t.firstTournamentMatch || "Prima partita del torneo",
+        date: tournamentStart,
+        description: t.lockModeTournament,
+      };
+    }
+
+    if (mode === "stage" || mode === "stage_round") {
+      const knockoutMatches = buildKnockoutMatches();
+      const nextKnockoutRound = getCurrentKnockoutRoundForValidation(knockoutMatches);
+      const nextKnockoutDate = nextKnockoutRound ? getRoundStartDate(nextKnockoutRound) : null;
+      const tournamentDate = tournamentStart;
+
+      if (tournamentDate && new Date() < new Date(tournamentDate)) {
+        return {
+          title: t.groupPredictions,
+          date: tournamentDate,
+          description: mode === "stage_round" ? t.lockModeStageRound : t.lockModeStage,
+        };
+      }
+
+      if (nextKnockoutDate) {
+        return {
+          title: nextKnockoutRound ? trRoundName(nextKnockoutRound) : t.knockoutPredictions,
+          date: nextKnockoutDate,
+          description: t.knockoutPredictions,
+        };
+      }
+    }
+
+    return {
+      title: nextMatch ? `${trTeamLabel(nextMatch.home)} - ${trTeamLabel(nextMatch.away)}` : t.noDeadline,
+      date: nextMatch?.kickoff || null,
+      description: t.lockModeMatch,
+    };
+  }
+
+
   if (selectedLeague) {
     const ranking = getRanking();
+    const dashboardStats = getLeagueDashboardStats(ranking);
     const users = getPlayersInLeague();
     const filteredPlayers = selectedPredictionPlayer === "__all__" ? users : users.filter((name) => name === selectedPredictionPlayer);
     const knockoutMatches = buildKnockoutMatches();
@@ -1750,6 +1831,7 @@ function getPredictionLockText(match) {
     const countdownTargetMatch = leagueSettings.prediction_lock_mode === "tournament" ? null : nextMatch;
     const countdownTargetDate = leagueSettings.prediction_lock_mode === "tournament" ? tournamentStartDate : countdownTargetMatch?.kickoff;
     const countdownParts = getCountdownParts(countdownTargetDate);
+    const nextDeadlineInfo = getNextDeadlineInfo(nextMatch, tournamentStartDate);
     const menuItems = [
       { key: "home", icon: "🏠", label: t.leagueHome || t.leagueHome || "Home" },
       { key: "live", icon: "🔴", label: "Live Match Center" },
@@ -1828,6 +1910,9 @@ function getPredictionLockText(match) {
           countdownParts={countdownParts}
           renderCountdownBox={renderCountdownBox}
           leagueSettings={leagueSettings}
+          dashboardStats={dashboardStats}
+          nextDeadlineInfo={nextDeadlineInfo}
+          setActiveTab={setActiveTab}
         />}
 
         {activeTab === "live" && (
