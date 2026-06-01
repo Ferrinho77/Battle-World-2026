@@ -395,7 +395,11 @@ export const translations = {
     "quickStatusHelp": "Controlla subito chi ha compilato e cosa manca prima della scadenza.",
     "openPredictions": "Apri pronostici",
     "openRanking": "Apri classifica",
-    "zeroPoints": "0 punti"
+    "zeroPoints": "0 punti",
+    "fullPlayerList": "Lista completa giocatori",
+    "instructionsIntro": "Questa guida spiega come partecipare alla lega e come compilare i pronostici.",
+    "instructionJoinLeagueTitle": "Entra nella lega",
+    "instructionJoinLeagueText": "Registrati, fai login e inserisci il codice lega ricevuto dall’amministratore. Dopo l’ingresso vedrai Home, Pronostici, Regole, Punteggi e Ranking."
   },
   "en": {
     "appTitle": "Battle World Cup 2026",
@@ -793,7 +797,11 @@ export const translations = {
     "quickStatusHelp": "Quickly check who has completed predictions and what is still missing before the deadline.",
     "openPredictions": "Open predictions",
     "openRanking": "Open ranking",
-    "zeroPoints": "0 points"
+    "zeroPoints": "0 points",
+    "fullPlayerList": "Full player list",
+    "instructionsIntro": "This guide explains how to join the league and submit your predictions.",
+    "instructionJoinLeagueTitle": "Join the league",
+    "instructionJoinLeagueText": "Register, log in and enter the league code received from the administrator. Once inside, you will see Home, Predictions, Rules, Points and Ranking."
   },
   "ro": {
     "appTitle": "Battle World Cup 2026",
@@ -1191,6 +1199,10 @@ export const translations = {
     "quickStatusHelp": "Verifică rapid cine a completat predicțiile și ce lipsește înainte de termen.",
     "openPredictions": "Deschide predicțiile",
     "openRanking": "Deschide clasamentul",
-    "zeroPoints": "0 puncte"
+    "zeroPoints": "0 puncte",
+    "fullPlayerList": "Lista completă de jucători",
+    "instructionsIntro": "Acest ghid explică modul de înscriere în ligă și completarea predicțiilor.",
+    "instructionJoinLeagueTitle": "Intră în ligă",
+    "instructionJoinLeagueText": "Înregistrează-te, autentifică-te și introdu codul ligii primit de la administrator. După intrare vei vedea Home, Predicții, Reguli, Punctaje și Clasament."
   }
 };

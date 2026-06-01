@@ -541,13 +541,21 @@ function getPredictionLockText(match) {
     return Object.values(map);
   }
 
+  function getLeagueParticipantRows() {
+    return leagueParticipants.map((participant) => ({
+      user_id: participant.user_id,
+      name: participant.name || participant.email || `User ${String(participant.user_id || "").slice(0, 6)}`,
+      email: participant.email || "",
+    }));
+  }
+
   function getPlayersInLeague() {
     return Array.from(new Set([
-      ...leagueParticipants.map((participant) => participant.name || participant.email || "User"),
-      ...uniquePredictions().map((p) => p.username || "User"),
+      ...getLeagueParticipantRows().map((participant) => participant.name),
+      ...uniquePredictions().map((p) => p.username || p.user_email || "User"),
       ...allBonusPredictions.map((p) => p.username || p.user_email || "User"),
       ...allTopScorerPredictions.map((p) => p.username || p.user_email || "User"),
-    ]));
+    ].filter(Boolean)));
   }
 
   function getPredictionColor(prediction, real) {
@@ -826,43 +834,78 @@ function getPredictionLockText(match) {
     const topScorerPredictions = getTopScorerPredictions();
     const finalScorer = getFinalTopScorer();
 
+    function ensureRankingRow(name, userId = "") {
+      const safeName = name || (userId ? `User ${String(userId).slice(0, 6)}` : t.user);
+      if (!ranking[safeName]) {
+        ranking[safeName] = {
+          name: safeName,
+          user_id: userId,
+          matchPoints: 0,
+          qualificationBonus: 0,
+          groupBonus: 0,
+          topScorerPoints: 0,
+          total: 0,
+          exact: 0,
+          outcome: 0,
+          topScorer: topScorerPredictions[safeName] || "",
+        };
+      }
+      return ranking[safeName];
+    }
+
+    getLeagueParticipantRows().forEach((participant) => {
+      ensureRankingRow(participant.name, participant.user_id);
+    });
+
     uniquePredictions().forEach((p) => {
       if (isTopScorerPrediction(p.match_id)) return;
-      const name = p.username || t.user;
+      const name = p.username || p.user_email || "User";
+      const row = ensureRankingRow(name, p.user_id);
       const real = realResults[p.match_id];
       const points = calculatePoints(p, real);
-      if (!ranking[name]) ranking[name] = { name, matchPoints: 0, qualificationBonus: 0, groupBonus: 0, topScorerPoints: 0, total: 0, exact: 0, outcome: 0, topScorer: topScorerPredictions[name] || "" };
-      ranking[name].matchPoints += points;
+
+      row.matchPoints += points;
+
       if (real && p) {
-        const ph = p.home_score, pa = p.away_score;
-        const rh = real.home_score, ra = real.away_score;
-        if (ph === rh && pa === ra) ranking[name].exact += 1;
-        else {
+        const ph = p.home_score;
+        const pa = p.away_score;
+        const rh = real.home_score;
+        const ra = real.away_score;
+
+        if (ph === rh && pa === ra) {
+          row.exact += 1;
+        } else {
           const predWinner = ph > pa ? "H" : ph < pa ? "A" : "D";
           const realWinner = rh > ra ? "H" : rh < ra ? "A" : "D";
-          if (predWinner === realWinner) ranking[name].outcome += 1;
+          if (predWinner === realWinner) row.outcome += 1;
         }
       }
     });
 
     Object.entries(topScorerPredictions).forEach(([name, player]) => {
-      if (!ranking[name]) ranking[name] = { name, matchPoints: 0, qualificationBonus: 0, groupBonus: 0, topScorerPoints: 0, total: 0, exact: 0, outcome: 0, topScorer: player };
-      ranking[name].topScorer = player;
+      const row = ensureRankingRow(name);
+      row.topScorer = player;
     });
 
     getPlayersInLeague().forEach((name) => {
-      if (!ranking[name]) ranking[name] = { name, matchPoints: 0, qualificationBonus: 0, groupBonus: 0, topScorerPoints: 0, total: 0, exact: 0, outcome: 0, topScorer: topScorerPredictions[name] || "" };
+      ensureRankingRow(name);
     });
 
     Object.values(ranking).forEach((row) => {
       const bonus = getBonusPointsForPlayer(row.name);
       row.qualificationBonus = bonus.qualificationPoints;
       row.groupBonus = bonus.groupPoints;
-      row.topScorerPoints = finalScorer && row.topScorer === finalScorer ? leagueSettings.top_scorer_points : 0;
+      row.topScorerPoints = finalScorer && row.topScorer === finalScorer ? Number(leagueSettings.top_scorer_points || 0) : 0;
       row.total = row.matchPoints + row.qualificationBonus + row.groupBonus + row.topScorerPoints;
     });
 
-    return Object.values(ranking).sort((a, b) => b.total - a.total || b.matchPoints - a.matchPoints || b.exact - a.exact || b.outcome - a.outcome);
+    return Object.values(ranking).sort((a, b) =>
+      b.total - a.total ||
+      b.matchPoints - a.matchPoints ||
+      b.exact - a.exact ||
+      b.outcome - a.outcome ||
+      a.name.localeCompare(b.name)
+    );
   }
 
   function getGroupStandings(groupName) {
@@ -2441,6 +2484,26 @@ function getPredictionLockText(match) {
                 <strong>{selectedTopScorer}</strong>
               </div>
             )}
+
+            <div className="player-full-list">
+              <div className="player-full-list-title">📋 {t.fullPlayerList || "Lista completa giocatori"}</div>
+              <div className="player-full-list-scroll">
+                {(topScorerSearch ? filteredTopScorers : selectableTopScorers).slice(0, 80).map((player) => (
+                  <button
+                    type="button"
+                    key={`full-${player}`}
+                    className={selectedTopScorer === player ? "active" : ""}
+                    disabled={isTournamentStarted()}
+                    onClick={() => {
+                      setSelectedTopScorer(player);
+                      setTopScorerSearch(player);
+                    }}
+                  >
+                    {player}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <small style={{ display: "block", color: "#9fb1c8", marginBottom: 10 }}>
@@ -2448,6 +2511,20 @@ function getPredictionLockText(match) {
           </small>
           <button disabled={isTournamentStarted()} className="btn green legacy-action" onClick={saveTopScorerPrediction}>{t.saveTopScorer}</button>
           {renderTopScorerRankingBox()}
+        </>}
+
+        {activeTab === "istruzioni" && <>
+          <h2>🎮 {t.gameInstructions}</h2>
+          <div className="league-box instructions-box">
+            <p className="rules-intro">{t.instructionsIntro}</p>
+            <div className="instruction-step"><h3>1️⃣ {t.instructionJoinLeagueTitle}</h3><p>{t.instructionJoinLeagueText}</p></div>
+            <div className="instruction-step"><h3>2️⃣ {t.matchPredictionsRulesTitle}</h3><p>{leagueSettings.prediction_lock_mode === "stage_round" ? t.lockModeStageRoundRule : leagueSettings.prediction_lock_mode === "stage" ? t.lockModeStageRule : leagueSettings.prediction_lock_mode === "tournament" ? t.lockModeTournamentRule : t.lockModeMatchRule}</p></div>
+            {leagueSettings.enable_qualification_bonus && <div className="instruction-step"><h3>3️⃣ {t.qualifiedRulesTitle}</h3><p>{leagueSettings.qualification_bonus_mode === "fixed" ? t.qualificationActiveFixedRule : t.qualificationActiveRoundRule}</p></div>}
+            {leagueSettings.enable_group_positions_bonus && <div className="instruction-step"><h3>4️⃣ {t.groupRankingRulesTitle}</h3><p>{t.groupPlacementActiveRule}</p></div>}
+            <div className="instruction-step"><h3>🥾 {t.goldenBootRulesTitle}</h3><p>{t.goldenBootActiveRule}</p></div>
+            <div className="instruction-step"><h3>🏆 {t.rankingRulesTitle}</h3><p>{t.rankingRulesTextFull}</p></div>
+            <div className="instruction-actions"><button type="button" className="btn blue" onClick={() => setActiveTab("regole")}>📖 {t.rules}</button><button type="button" className="btn green" onClick={() => setActiveTab("punteggi")}>🏆 {t.pointsSystem}</button></div>
+          </div>
         </>}
 
         {activeTab === "admin" && isGlobalControlRoomAdmin && (
