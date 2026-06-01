@@ -1171,7 +1171,13 @@ function getPlayersInLeague() {
 
   async function saveLeagueSettings() {
     if (!validateLeagueSettings()) return;
-    const { error } = await supabase.from("leagues").update(leagueSettings).eq("id", selectedLeague.id);
+
+    const settingsToSave = { ...leagueSettings };
+    if (!isControlRoomOwner) {
+      delete settingsToSave.control_room_allowed_emails;
+    }
+
+    const { error } = await supabase.from("leagues").update(settingsToSave).eq("id", selectedLeague.id);
     if (error) { setMessage(error.message); return; }
     await loadLeagueSettings(selectedLeague.id);
     setMessage(`${t.leagueSettingsSaved} ✅`);
@@ -2361,17 +2367,29 @@ function getPlayersInLeague() {
             <p><strong>{t.syncStatus}:</strong> {liveSyncStatus || t.waitingFirstSync}</p>
           </div>
           {isControlRoomOwner && (
-            <div className="league-box">
+
+            <div className="league-box owner-only-control-room-box">
+
               <h3>🛠️ {t.controlRoomAccess}</h3>
+
               <label>{t.controlRoomAllowedEmails}</label>
+
               <textarea
+
                 rows="3"
+
                 placeholder={t.controlRoomAllowedEmailsPlaceholder}
+
                 value={leagueSettings.control_room_allowed_emails || ""}
+
                 onChange={(e) => setLeagueSettings({ ...leagueSettings, control_room_allowed_emails: e.target.value })}
+
               />
+
               <p className="bonus-help">{t.controlRoomAllowedEmailsHelp}</p>
+
             </div>
+
           )}
           <div className="league-box">
             <h3>⚽ {t.matchPointsSettings}</h3>
