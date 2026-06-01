@@ -115,14 +115,14 @@ function App() {
           )
         );
   const t = translations[language] || translations.it;
+  const currentUserEmail = String(user?.email || "").trim().toLowerCase();
   const controlRoomAllowedEmails = String(leagueSettings.control_room_allowed_emails || "")
     .split(/[;,\n]/)
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
-  const isControlRoomOwner = String(user?.email || "").toLowerCase() === GLOBAL_CONTROL_ROOM_EMAIL;
   const isGlobalControlRoomAdmin =
-    isControlRoomOwner ||
-    controlRoomAllowedEmails.includes(String(user?.email || "").toLowerCase());
+    String(user?.email || "").toLowerCase() === GLOBAL_CONTROL_ROOM_EMAIL ||
+    controlRoomAllowedEmails.includes(currentUserEmail);
 
   function formatText(template, values = {}) {
     return String(template || "").replace(/\{(\w+)\}/g, (_, key) => values[key] ?? "");
@@ -1173,7 +1173,7 @@ function getPlayersInLeague() {
     if (!validateLeagueSettings()) return;
 
     const settingsToSave = { ...leagueSettings };
-    if (!isControlRoomOwner) {
+    if (currentUserEmail !== GLOBAL_CONTROL_ROOM_EMAIL) {
       delete settingsToSave.control_room_allowed_emails;
     }
 
@@ -2366,30 +2366,18 @@ function getPlayersInLeague() {
             <p>{t.liveApiInfo}</p>
             <p><strong>{t.syncStatus}:</strong> {liveSyncStatus || t.waitingFirstSync}</p>
           </div>
-          {isControlRoomOwner && (
-
+          {currentUserEmail === GLOBAL_CONTROL_ROOM_EMAIL && (
             <div className="league-box owner-only-control-room-box">
-
               <h3>🛠️ {t.controlRoomAccess}</h3>
-
               <label>{t.controlRoomAllowedEmails}</label>
-
               <textarea
-
                 rows="3"
-
                 placeholder={t.controlRoomAllowedEmailsPlaceholder}
-
                 value={leagueSettings.control_room_allowed_emails || ""}
-
                 onChange={(e) => setLeagueSettings({ ...leagueSettings, control_room_allowed_emails: e.target.value })}
-
               />
-
               <p className="bonus-help">{t.controlRoomAllowedEmailsHelp}</p>
-
             </div>
-
           )}
           <div className="league-box">
             <h3>⚽ {t.matchPointsSettings}</h3>
