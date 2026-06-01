@@ -119,8 +119,9 @@ function App() {
     .split(/[;,\n]/)
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
+  const isControlRoomOwner = String(user?.email || "").toLowerCase() === GLOBAL_CONTROL_ROOM_EMAIL;
   const isGlobalControlRoomAdmin =
-    String(user?.email || "").toLowerCase() === GLOBAL_CONTROL_ROOM_EMAIL ||
+    isControlRoomOwner ||
     controlRoomAllowedEmails.includes(String(user?.email || "").toLowerCase());
 
   function formatText(template, values = {}) {
@@ -551,7 +552,73 @@ function getPredictionLockText(match) {
     }));
   }
 
-  function getPlayersInLeague() {
+  
+  function getParticipantCompletionStatus(participant) {
+    const byUserId = (row) => row.user_id === participant.user_id;
+    const byNameOrEmail = (row) =>
+      (row.username || row.user_email || "") === participant.name ||
+      (row.username || row.user_email || "") === participant.email;
+
+    const hasMatchPredictions = uniquePredictions().some((row) =>
+      (byUserId(row) || byNameOrEmail(row)) &&
+      row.home_score !== undefined && row.home_score !== "" &&
+      row.away_score !== undefined && row.away_score !== ""
+    );
+
+    const hasGoldenBoot = allTopScorerPredictions.some((row) =>
+      (byUserId(row) || byNameOrEmail(row)) && !!row.player
+    );
+
+    const hasQualified = allBonusPredictions.some((row) =>
+      (byUserId(row) || byNameOrEmail(row)) && row.prediction_type === "qualification"
+    );
+
+    const hasGroupRanking = allBonusPredictions.some((row) =>
+      (byUserId(row) || byNameOrEmail(row)) && row.prediction_type === "group_position"
+    );
+
+    return {
+      hasMatchPredictions,
+      hasGoldenBoot,
+      hasQualified,
+      hasGroupRanking,
+    };
+  }
+
+  async function removeParticipantFromLeague(participant) {
+    if (!selectedLeague || !participant?.user_id) return;
+
+    if (selectedLeague.owner_id === participant.user_id) {
+      setMessage(t.cannotRemoveOwner);
+      return;
+    }
+
+    const ok = window.confirm(`${t.confirmRemoveParticipant}\n\n${participant.name || participant.email}`);
+    if (!ok) return;
+
+    await supabase.from("top_scorer_predictions").delete().eq("league_id", selectedLeague.id).eq("user_id", participant.user_id);
+    await supabase.from("bonus_predictions").delete().eq("league_id", selectedLeague.id).eq("user_id", participant.user_id);
+    await supabase.from("predictions").delete().eq("league_id", selectedLeague.id).eq("user_id", participant.user_id);
+
+    const { error } = await supabase
+      .from("league_members")
+      .delete()
+      .eq("league_id", selectedLeague.id)
+      .eq("user_id", participant.user_id);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    await loadLeagueParticipants(selectedLeague.id);
+    await loadAllPredictions(selectedLeague.id);
+    await loadAllBonusPredictions(selectedLeague.id);
+    await loadAllTopScorerPredictions(selectedLeague.id);
+    setMessage(`${t.participantRemoved} ✅`);
+  }
+
+function getPlayersInLeague() {
     return Array.from(new Set([
       ...getLeagueParticipantRows().map((participant) => participant.name),
       ...uniquePredictions().map((p) => p.username || p.user_email || "User"),
@@ -1898,7 +1965,7 @@ function getPredictionLockText(match) {
       { key: "tabellone", icon: "🧩", label: t.bracket },
       { key: "settings", icon: "⚙️", label: t.settings },
       ...(isGlobalControlRoomAdmin ? [{ key: "admin", icon: "🛠️", label: t.admin }] : []),
-      ...(isAdmin ? [{ key: "league-settings", icon: "🎛️", label: t.leagueSettings }] : []),
+      ...(isAdmin ? [{ key: "league-settings", icon: "🎛️", label: t.leagueSettings }, { key: "manage-participants", icon: "👤", label: t.manageParticipants }] : []),
       { key: "regole", icon: "📜", label: t.rules },
       { key: "punteggi", icon: "🏆", label: t.pointsSystem },
       { key: "istruzioni", icon: "🎮", label: t.gameInstructions },
@@ -2225,6 +2292,67 @@ function getPredictionLockText(match) {
           </div>
         </>}
 
+        {activeTab === "manage-participants" && isAdmin && <>
+          <h2>👤 {t.manageParticipants}</h2>
+          <div className="league-box admin-users-box">
+            <p className="rules-intro">{t.allLeagueMembersRanking || "Qui vedi tutti i partecipanti della lega."}</p>
+            <div className="table-wrapper">
+              <table className="admin-users-table">
+                <thead>
+                  <tr>
+                    <th>{t.participant || t.user}</th>
+                    <th>{t.participantEmail}</th>
+                    <th>{t.participantRole}</th>
+                    <th>{t.participantStatus}</th>
+                    <th>{t.actions || ""}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leagueParticipants.map((participant) => {
+                    const status = getParticipantCompletionStatus(participant);
+                    const isOwnerParticipant = selectedLeague?.owner_id === participant.user_id;
+
+                    return (
+                      <tr key={participant.user_id}>
+                        <td>
+                          <div className="ranking-player-cell">
+                            <span className="avatar-badge avatar-normal ranking-avatar">
+                              {participant.avatar_url ? <img src={participant.avatar_url} alt={participant.name} /> : <span>{participant.avatar_icon || "⚽"}</span>}
+                            </span>
+                            <strong>{participant.name}</strong>
+                          </div>
+                        </td>
+                        <td>{participant.email || "-"}</td>
+                        <td>
+                          {isOwnerParticipant ? t.owner : participant.role === "admin" ? t.adminRole : t.member}
+                        </td>
+                        <td>
+                          <div className="completion-tags">
+                            <span className={status.hasMatchPredictions ? "ok" : "missing"}>{t.matchPredictionsShort}: {status.hasMatchPredictions ? t.completedStatus : t.missingStatus}</span>
+                            <span className={status.hasGoldenBoot ? "ok" : "missing"}>{t.goldenBootShort}: {status.hasGoldenBoot ? t.completedStatus : t.missingStatus}</span>
+                            {leagueSettings.enable_qualification_bonus && <span className={status.hasQualified ? "ok" : "missing"}>{t.qualifiedShort}: {status.hasQualified ? t.completedStatus : t.missingStatus}</span>}
+                            {leagueSettings.enable_group_positions_bonus && <span className={status.hasGroupRanking ? "ok" : "missing"}>{t.groupRankingShort}: {status.hasGroupRanking ? t.completedStatus : t.missingStatus}</span>}
+                          </div>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn danger"
+                            disabled={isOwnerParticipant}
+                            onClick={() => removeParticipantFromLeague(participant)}
+                          >
+                            {t.removeFromLeague}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>}
+
         {activeTab === "league-settings" && isAdmin && <>
           <h2>{t.leagueSettings}</h2>
           <div className="league-box live-api-box">
@@ -2232,17 +2360,19 @@ function getPredictionLockText(match) {
             <p>{t.liveApiInfo}</p>
             <p><strong>{t.syncStatus}:</strong> {liveSyncStatus || t.waitingFirstSync}</p>
           </div>
-          <div className="league-box">
-            <h3>🛠️ {t.controlRoomAccess}</h3>
-            <label>{t.controlRoomAllowedEmails}</label>
-            <textarea
-              rows="3"
-              placeholder={t.controlRoomAllowedEmailsPlaceholder}
-              value={leagueSettings.control_room_allowed_emails || ""}
-              onChange={(e) => setLeagueSettings({ ...leagueSettings, control_room_allowed_emails: e.target.value })}
-            />
-            <p className="bonus-help">{t.controlRoomAllowedEmailsHelp}</p>
-          </div>
+          {isControlRoomOwner && (
+            <div className="league-box">
+              <h3>🛠️ {t.controlRoomAccess}</h3>
+              <label>{t.controlRoomAllowedEmails}</label>
+              <textarea
+                rows="3"
+                placeholder={t.controlRoomAllowedEmailsPlaceholder}
+                value={leagueSettings.control_room_allowed_emails || ""}
+                onChange={(e) => setLeagueSettings({ ...leagueSettings, control_room_allowed_emails: e.target.value })}
+              />
+              <p className="bonus-help">{t.controlRoomAllowedEmailsHelp}</p>
+            </div>
+          )}
           <div className="league-box">
             <h3>⚽ {t.matchPointsSettings}</h3>
             <div className="bonus-settings-grid">
