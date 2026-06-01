@@ -369,7 +369,17 @@ export const translations = {
     "rulesCurrentSetup": "Configurazione attuale",
     "goToPointsForValues": "Per vedere i valori esatti dei punti, apri la pagina Punteggi.",
     "whatCounts": "Cosa viene conteggiato",
-    "rulesSummary": "Sintesi regole"
+    "rulesSummary": "Sintesi regole",
+    "lockModeStageRound": "Gironi prima del torneo + eliminazione prima di ogni turno",
+    "lockModeStageRoundRule": "In questa lega la Fase a Gironi deve essere compilata prima della prima partita del Mondiale. La Fase Finale si compila per tappa: Sedicesimi prima della prima partita dei Sedicesimi, Ottavi prima della prima partita degli Ottavi, e così via.",
+    "lockModeStageRoundHelp": "Consigliato: gironi tutti prima dell’inizio del torneo; fase a eliminazione prima dell’inizio di ogni turno.",
+    "ownerControlRoomOnly": "Control Room riservata al proprietario globale",
+    "allLeagueMembersRanking": "Nel ranking vengono mostrati anche i partecipanti senza punti.",
+    "noPredictionsYet": "Nessun pronostico ancora",
+    "controlRoomAccess": "Accesso Control Room",
+    "controlRoomAllowedEmails": "Email autorizzate Control Room",
+    "controlRoomAllowedEmailsHelp": "Inserisci una o più email registrate, separate da virgola. Tu resti sempre autorizzato automaticamente.",
+    "controlRoomAllowedEmailsPlaceholder": "es. amico@email.com, admin@email.com"
   },
   "en": {
     "appTitle": "Battle World Cup 2026",
@@ -741,7 +751,17 @@ export const translations = {
     "rulesCurrentSetup": "Current setup",
     "goToPointsForValues": "To see the exact point values, open the Points page.",
     "whatCounts": "What counts",
-    "rulesSummary": "Rules summary"
+    "rulesSummary": "Rules summary",
+    "lockModeStageRound": "Groups before tournament + knockout before each round",
+    "lockModeStageRoundRule": "In this league, Group Stage predictions must be completed before the first World Cup match. Knockout predictions are completed round by round: Round of 32 before the first Round of 32 match, Round of 16 before the first Round of 16 match, and so on.",
+    "lockModeStageRoundHelp": "Recommended: complete all group predictions before the tournament starts; complete knockout predictions before each round starts.",
+    "ownerControlRoomOnly": "Control Room restricted to global owner",
+    "allLeagueMembersRanking": "The ranking also shows participants with zero points.",
+    "noPredictionsYet": "No predictions yet",
+    "controlRoomAccess": "Control Room Access",
+    "controlRoomAllowedEmails": "Control Room authorized emails",
+    "controlRoomAllowedEmailsHelp": "Enter one or more registered emails, separated by commas. You always remain authorized automatically.",
+    "controlRoomAllowedEmailsPlaceholder": "e.g. friend@email.com, admin@email.com"
   },
   "ro": {
     "appTitle": "Battle World Cup 2026",
@@ -1113,6 +1133,16 @@ export const translations = {
     "rulesCurrentSetup": "Configurație actuală",
     "goToPointsForValues": "Pentru valorile exacte ale punctelor, deschide pagina Punctaje.",
     "whatCounts": "Ce se punctează",
-    "rulesSummary": "Rezumat reguli"
+    "rulesSummary": "Rezumat reguli",
+    "lockModeStageRound": "Grupe înainte de turneu + eliminatorii înainte de fiecare rundă",
+    "lockModeStageRoundRule": "În această ligă, predicțiile pentru Faza Grupelor trebuie completate înainte de primul meci al Cupei Mondiale. Predicțiile eliminatorii se completează pe runde: Șaisprezecimi înainte de primul meci al Șaisprezecimilor, Optimi înainte de primul meci al Optimilor și așa mai departe.",
+    "lockModeStageRoundHelp": "Recomandat: completezi toate predicțiile grupelor înainte de startul turneului; completezi eliminatoriile înainte de fiecare rundă.",
+    "ownerControlRoomOnly": "Control Room rezervat proprietarului global",
+    "allLeagueMembersRanking": "Clasamentul afișează și participanții cu zero puncte.",
+    "noPredictionsYet": "Încă nu există predicții",
+    "controlRoomAccess": "Acces Control Room",
+    "controlRoomAllowedEmails": "Emailuri autorizate Control Room",
+    "controlRoomAllowedEmailsHelp": "Introdu una sau mai multe emailuri înregistrate, separate prin virgulă. Tu rămâi mereu autorizat automat.",
+    "controlRoomAllowedEmailsPlaceholder": "ex. prieten@email.com, admin@email.com"
   }
 };

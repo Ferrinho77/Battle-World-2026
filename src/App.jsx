@@ -17,6 +17,7 @@ import { translations } from "./translations";
 
 const LIVE_REFRESH_MS = 10 * 60 * 1000;
 const IDLE_REFRESH_MS = 60 * 60 * 1000;
+const GLOBAL_CONTROL_ROOM_EMAIL = "fabioferrigno1@hotmail.com";
 
 function getNextSyncDate(intervalMs) {
   return new Date(Date.now() + intervalMs);
@@ -77,6 +78,7 @@ function App() {
     bonus_final_points: 8,
     bonus_champion_points: 15,
     bonus_group_exact_points: 3,
+    control_room_allowed_emails: "",
   });
   const [isAdmin, setIsAdmin] = useState(false);
   const [predictions, setPredictions] = useState({});
@@ -96,6 +98,7 @@ function App() {
   const [playersLoading, setPlayersLoading] = useState(false);
   const [topScorerSearch, setTopScorerSearch] = useState("");
   const [allTopScorerPredictions, setAllTopScorerPredictions] = useState([]);
+  const [leagueParticipants, setLeagueParticipants] = useState([]);
   const selectableTopScorers = Array.from(new Set([
     ...topScorers,
     ...players.map((p) => p.label),
@@ -112,6 +115,13 @@ function App() {
           )
         );
   const t = translations[language] || translations.it;
+  const controlRoomAllowedEmails = String(leagueSettings.control_room_allowed_emails || "")
+    .split(/[;,\n]/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  const isGlobalControlRoomAdmin =
+    String(user?.email || "").toLowerCase() === GLOBAL_CONTROL_ROOM_EMAIL ||
+    controlRoomAllowedEmails.includes(String(user?.email || "").toLowerCase());
 
   function formatText(template, values = {}) {
     return String(template || "").replace(/\{(\w+)\}/g, (_, key) => values[key] ?? "");
@@ -417,7 +427,7 @@ function App() {
 
   function getPredictionLockDate(match) {
     if (leagueSettings.prediction_lock_mode === "tournament") return getTournamentStartDate();
-    if (leagueSettings.prediction_lock_mode === "stage") {
+    if (leagueSettings.prediction_lock_mode === "stage" || leagueSettings.prediction_lock_mode === "stage_round") {
       if (String(match?.id || "").startsWith("ko-")) return getRoundStartDate(match.round) || (match?.kickoff ? new Date(match.kickoff) : null);
       return getTournamentStartDate();
     }
@@ -443,7 +453,7 @@ function getPredictionLockText(match) {
     const date = getPredictionLockDate(match);
     const label = formatLockDate(date);
     if (leagueSettings.prediction_lock_mode === "tournament") return `Compilabile fino alla prima partita del torneo: ${label}`;
-    if (leagueSettings.prediction_lock_mode === "stage") {
+    if (leagueSettings.prediction_lock_mode === "stage" || leagueSettings.prediction_lock_mode === "stage_round") {
       if (String(match?.id || "").startsWith("ko-")) return `Compilabile fino alla prima partita del turno ${trRoundName(match.round)}: ${label}`;
       return `Compilabile fino alla prima partita del torneo: ${label}`;
     }
@@ -455,6 +465,17 @@ function getPredictionLockText(match) {
     if (!lockDate) return false;
     return new Date() >= new Date(lockDate);
   }
+
+  function getCurrentKnockoutRoundForValidation(matchList = []) {
+    const knockoutOnly = matchList.filter((match) => String(match?.id || "").startsWith("ko-"));
+    const upcoming = knockoutOnly
+      .map((match) => ({ match, lockDate: getRoundStartDate(match.round) || (match.kickoff ? new Date(match.kickoff) : null) }))
+      .filter((row) => row.lockDate && new Date(row.lockDate) > new Date())
+      .sort((a, b) => new Date(a.lockDate) - new Date(b.lockDate));
+
+    return upcoming[0]?.match?.round || null;
+  }
+
 
   function getTournamentStartDate() {
     const validDates = matches
@@ -522,6 +543,7 @@ function getPredictionLockText(match) {
 
   function getPlayersInLeague() {
     return Array.from(new Set([
+      ...leagueParticipants.map((participant) => participant.name || participant.email || "User"),
       ...uniquePredictions().map((p) => p.username || "User"),
       ...allBonusPredictions.map((p) => p.username || p.user_email || "User"),
       ...allTopScorerPredictions.map((p) => p.username || p.user_email || "User"),
@@ -965,6 +987,7 @@ function getPredictionLockText(match) {
         bonus_final_points: data.bonus_final_points ?? 8,
         bonus_champion_points: data.bonus_champion_points ?? 15,
         bonus_group_exact_points: data.bonus_group_exact_points ?? 3,
+        control_room_allowed_emails: data.control_room_allowed_emails ?? "",
       });
       setIsAdmin(data.owner_id === user.id);
     }
@@ -1057,6 +1080,43 @@ function getPredictionLockText(match) {
     if (!leagueId) return;
     const { data } = await supabase.from("predictions").select("*").eq("league_id", leagueId);
     setAllPredictions(data || []);
+  }
+
+  async function loadLeagueParticipants(leagueId) {
+    if (!leagueId) {
+      setLeagueParticipants([]);
+      return;
+    }
+
+    const { data: members, error } = await supabase
+      .from("league_members")
+      .select("user_id, role")
+      .eq("league_id", leagueId);
+
+    if (error || !members?.length) {
+      setLeagueParticipants([]);
+      return;
+    }
+
+    const ids = members.map((member) => member.user_id).filter(Boolean);
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, username, email")
+      .in("id", ids);
+
+    const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
+
+    setLeagueParticipants(
+      members.map((member) => {
+        const profile = profileMap.get(member.user_id);
+        return {
+          user_id: member.user_id,
+          role: member.role,
+          name: profile?.username || profile?.email || `User ${String(member.user_id || "").slice(0, 6)}`,
+          email: profile?.email || "",
+        };
+      })
+    );
   }
 
   async function loadTopScorerPrediction(userId, leagueId) {
@@ -1275,7 +1335,7 @@ function getPredictionLockText(match) {
 
   async function logout() {
     await supabase.auth.signOut();
-    setPlayer(null); setSelectedLeague(null); setLeagues([]); setPlayername(""); setSettingsPlayername("");
+    setPlayer(null); setSelectedLeague(null); setLeagues([]); setLeagueParticipants([]); setPlayername(""); setSettingsPlayername("");
   }
 
   async function createLeague() {
@@ -1291,7 +1351,7 @@ function getPredictionLockText(match) {
     const { data: league, error } = await supabase.from("leagues").select("*").eq("code", joinCode).single();
     if (error || !league) { setMessage(t.codeNotFound); return; }
     await supabase.from("league_members").insert({ league_id: league.id, user_id: user.id, role: "member" });
-    setJoinCode(""); loadLeagues(user.id); setMessage(`${t.joinedLeague} ✅`);
+    setJoinCode(""); loadLeagues(user.id); loadLeagueParticipants(league.id); setMessage(`${t.joinedLeague} ✅`);
   }
 
 
@@ -1327,6 +1387,7 @@ function getPredictionLockText(match) {
     setSelectedLeague(league);
     setActiveTab("home");
     loadAllPredictions(league.id);
+    loadLeagueParticipants(league.id);
     loadAllTopScorerPredictions(league.id);
     loadAllBonusPredictions(league.id);
     loadLeagueSettings(league.id);
@@ -1363,23 +1424,28 @@ function getPredictionLockText(match) {
 
   function validateMatchPredictions(matchList = matches) {
     const mode = leagueSettings.prediction_lock_mode || "match";
+    let validationList = matchList;
 
-    // Regole esatte da Configurazione Lega:
-    // match      = partita per partita: nessun obbligo di compilare tutto
-    // stage      = gironi prima della prima partita; fase finale libera per turno/partita
-    // tournament = tutti i pronostici prima: obbligo completo anche in fase finale
     const shouldRequireComplete =
       mode === "tournament" ||
-      (mode === "stage" && activeTab === "partite");
+      ((mode === "stage" || mode === "stage_round") && activeTab === "partite") ||
+      (mode === "stage_round" && activeTab === "eliminazione");
 
-    if (!shouldRequireComplete) {
+    if (mode === "stage_round" && activeTab === "eliminazione") {
+      const currentRound = getCurrentKnockoutRoundForValidation(matchList);
+      validationList = currentRound
+        ? matchList.filter((match) => match.round === currentRound)
+        : [];
+    }
+
+    if (!shouldRequireComplete || validationList.length === 0) {
       setMissingPredictionFields({});
       setValidationMessage("");
       return true;
     }
 
     const missing = {};
-    matchList.forEach((match) => {
+    validationList.forEach((match) => {
       if (isPredictionLocked(match)) return;
       const p = predictions[match.id] || {};
       if (p.home_score === undefined || p.home_score === "") missing[`${match.id}::home_score`] = true;
@@ -1697,7 +1763,8 @@ function getPredictionLockText(match) {
       { key: "gironi", icon: "📋", label: t.groupRanking },
       { key: "tabellone", icon: "🧩", label: t.bracket },
       { key: "settings", icon: "⚙️", label: t.settings },
-      ...(isAdmin ? [{ key: "admin", icon: "🛠️", label: t.admin }, { key: "league-settings", icon: "🎛️", label: t.leagueSettings }] : []),
+      ...(isGlobalControlRoomAdmin ? [{ key: "admin", icon: "🛠️", label: t.admin }] : []),
+      ...(isAdmin ? [{ key: "league-settings", icon: "🎛️", label: t.leagueSettings }] : []),
       { key: "regole", icon: "📜", label: t.rules },
       { key: "punteggi", icon: "🏆", label: t.pointsSystem },
       { key: "istruzioni", icon: "🎮", label: t.gameInstructions },
@@ -1792,9 +1859,11 @@ function getPredictionLockText(match) {
                 <p>
                   {leagueSettings.prediction_lock_mode === "tournament"
                     ? t.lockModeTournamentRule
-                    : leagueSettings.prediction_lock_mode === "stage"
-                      ? t.lockModeStageRule
-                      : t.lockModeMatchRule}
+                    : leagueSettings.prediction_lock_mode === "stage_round"
+                      ? t.lockModeStageRoundRule
+                      : leagueSettings.prediction_lock_mode === "stage"
+                        ? t.lockModeStageRule
+                        : t.lockModeMatchRule}
                 </p>
               </div>
 
@@ -2027,6 +2096,17 @@ function getPredictionLockText(match) {
             <p><strong>{t.syncStatus}:</strong> {liveSyncStatus || t.waitingFirstSync}</p>
           </div>
           <div className="league-box">
+            <h3>🛠️ {t.controlRoomAccess}</h3>
+            <label>{t.controlRoomAllowedEmails}</label>
+            <textarea
+              rows="3"
+              placeholder={t.controlRoomAllowedEmailsPlaceholder}
+              value={leagueSettings.control_room_allowed_emails || ""}
+              onChange={(e) => setLeagueSettings({ ...leagueSettings, control_room_allowed_emails: e.target.value })}
+            />
+            <p className="bonus-help">{t.controlRoomAllowedEmailsHelp}</p>
+          </div>
+          <div className="league-box">
             <h3>⚽ {t.matchPointsSettings}</h3>
             <div className="bonus-settings-grid">
               <label>{t.correctOutcome}<input min="0" max="20" type="number" className={missingSettingClass("outcome_points")} value={leagueSettings.outcome_points} onChange={(e) => setLeagueSettings({ ...leagueSettings, outcome_points: Number(e.target.value) })} /></label>
@@ -2036,6 +2116,7 @@ function getPredictionLockText(match) {
             <select className={missingSettingClass("prediction_lock_mode")} value={leagueSettings.prediction_lock_mode || "match"} onChange={(e) => setLeagueSettings({ ...leagueSettings, prediction_lock_mode: e.target.value })}>
               <option value="match">{t.lockModeMatch}</option>
               <option value="stage">{t.lockModeStage}</option>
+              <option value="stage_round">{t.lockModeStageRound}</option>
               <option value="tournament">{t.lockModeTournament}</option>
             </select>
             <p className="bonus-help">{t.lockModeHelp}</p>
@@ -2284,7 +2365,7 @@ function getPredictionLockText(match) {
           {renderTopScorerRankingBox()}
         </>}
 
-        {activeTab === "admin" && isAdmin && (
+        {activeTab === "admin" && isGlobalControlRoomAdmin && (
           <AdminPanel
             t={t}
             users={users}
