@@ -2366,7 +2366,7 @@ function getPlayersInLeague() {
             <p>{t.liveApiInfo}</p>
             <p><strong>{t.syncStatus}:</strong> {liveSyncStatus || t.waitingFirstSync}</p>
           </div>
-          {currentUserEmail === GLOBAL_CONTROL_ROOM_EMAIL && (
+          {String(user?.email || "").toLowerCase() === "fabioferrigno1@hotmail.com" && (
             <div className="league-box owner-only-control-room-box">
               <h3>🛠️ {t.controlRoomAccess}</h3>
               <label>{t.controlRoomAllowedEmails}</label>
