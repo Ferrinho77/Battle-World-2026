@@ -4441,3 +4441,22 @@ input::placeholder {
     flex: 1 1 140px;
   }
 }
+
+
+/* STEP 19D - ranking avatars */
+.ranking-player-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 150px;
+}
+
+.ranking-player-cell .avatar-badge {
+  flex: 0 0 auto;
+}
+
+.ranking-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

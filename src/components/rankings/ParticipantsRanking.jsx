@@ -1,9 +1,25 @@
+function RankingAvatar({ row, size = "normal" }) {
+  const cls = `avatar-badge avatar-${size} ranking-avatar`;
+  if (row?.avatar_url) {
+    return (
+      <span className={cls}>
+        <img src={row.avatar_url} alt={row.name || "avatar"} />
+      </span>
+    );
+  }
+
+  return (
+    <span className={cls}>
+      <span>{row?.avatar_icon || "⚽"}</span>
+    </span>
+  );
+}
+
 export default function ParticipantsRanking({
   t,
   lastLiveSync,
   liveSyncStatus,
   ranking,
-  AvatarBadge,
 }) {
   return (
     <>
@@ -24,7 +40,7 @@ export default function ParticipantsRanking({
                 {index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}
               </div>
               <div className="podium-avatar">
-                <AvatarBadge size="large" />
+                <RankingAvatar row={row} size="large" />
               </div>
               <strong>{row.name}</strong>
               <span>{row.total} pt</span>
@@ -72,7 +88,12 @@ export default function ParticipantsRanking({
                           ? "🥉"
                           : index + 1}
                   </td>
-                  <td>{row.name}</td>
+                  <td>
+                    <div className="ranking-player-cell">
+                      <RankingAvatar row={row} />
+                      <span>{row.name}</span>
+                    </div>
+                  </td>
                   <td>
                     <strong>{row.total}</strong>
                   </td>

@@ -546,6 +546,8 @@ function getPredictionLockText(match) {
       user_id: participant.user_id,
       name: participant.name || participant.email || `User ${String(participant.user_id || "").slice(0, 6)}`,
       email: participant.email || "",
+      avatar_icon: participant.avatar_icon || "⚽",
+      avatar_url: participant.avatar_url || "",
     }));
   }
 
@@ -834,12 +836,14 @@ function getPredictionLockText(match) {
     const topScorerPredictions = getTopScorerPredictions();
     const finalScorer = getFinalTopScorer();
 
-    function ensureRankingRow(name, userId = "") {
+    function ensureRankingRow(name, userId = "", avatarIcon = "⚽", avatarUrl = "") {
       const safeName = name || (userId ? `User ${String(userId).slice(0, 6)}` : t.user);
       if (!ranking[safeName]) {
         ranking[safeName] = {
           name: safeName,
           user_id: userId,
+          avatar_icon: avatarIcon || "⚽",
+          avatar_url: avatarUrl || "",
           matchPoints: 0,
           qualificationBonus: 0,
           groupBonus: 0,
@@ -849,12 +853,15 @@ function getPredictionLockText(match) {
           outcome: 0,
           topScorer: topScorerPredictions[safeName] || "",
         };
+      } else {
+        if (avatarUrl && !ranking[safeName].avatar_url) ranking[safeName].avatar_url = avatarUrl;
+        if (avatarIcon && (!ranking[safeName].avatar_icon || ranking[safeName].avatar_icon === "⚽")) ranking[safeName].avatar_icon = avatarIcon;
       }
       return ranking[safeName];
     }
 
     getLeagueParticipantRows().forEach((participant) => {
-      ensureRankingRow(participant.name, participant.user_id);
+      ensureRankingRow(participant.name, participant.user_id, participant.avatar_icon, participant.avatar_url);
     });
 
     uniquePredictions().forEach((p) => {
@@ -1144,7 +1151,7 @@ function getPredictionLockText(match) {
     const ids = members.map((member) => member.user_id).filter(Boolean);
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, username, email")
+      .select("id, username, email, avatar_icon, avatar_url")
       .in("id", ids);
 
     const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
@@ -1157,6 +1164,8 @@ function getPredictionLockText(match) {
           role: member.role,
           name: profile?.username || profile?.email || `User ${String(member.user_id || "").slice(0, 6)}`,
           email: profile?.email || "",
+          avatar_icon: profile?.avatar_icon || "⚽",
+          avatar_url: profile?.avatar_url || "",
         };
       })
     );
@@ -2488,7 +2497,7 @@ function getPredictionLockText(match) {
             <div className="player-full-list">
               <div className="player-full-list-title">📋 {t.fullPlayerList || "Lista completa giocatori"}</div>
               <div className="player-full-list-scroll">
-                {(topScorerSearch ? filteredTopScorers : selectableTopScorers).slice(0, 80).map((player) => (
+                {(topScorerSearch ? filteredTopScorers : selectableTopScorers).map((player) => (
                   <button
                     type="button"
                     key={`full-${player}`}
