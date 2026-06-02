@@ -80,6 +80,7 @@ function App() {
     bonus_group_exact_points: 3,
     control_room_allowed_emails: "",
   });
+  const [controlRoomEmailsRaw, setControlRoomEmailsRaw] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [predictions, setPredictions] = useState({});
   const [missingPredictionFields, setMissingPredictionFields] = useState({});
@@ -116,12 +117,18 @@ function App() {
         );
   const t = translations[language] || translations.it;
   const currentUserEmail = String(user?.email || "").trim().toLowerCase();
-  const controlRoomAllowedEmails = String(leagueSettings.control_room_allowed_emails || "")
+  const controlRoomEmailsSource =
+    controlRoomEmailsRaw ||
+    leagueSettings.control_room_allowed_emails ||
+    selectedLeague?.control_room_allowed_emails ||
+    "";
+  const controlRoomAllowedEmails = String(controlRoomEmailsSource)
     .split(/[;,\n]/)
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
+  const isControlRoomOwner = currentUserEmail === GLOBAL_CONTROL_ROOM_EMAIL;
   const isGlobalControlRoomAdmin =
-    String(user?.email || "").toLowerCase() === GLOBAL_CONTROL_ROOM_EMAIL ||
+    isControlRoomOwner ||
     controlRoomAllowedEmails.includes(currentUserEmail);
 
   function formatText(template, values = {}) {
@@ -1106,6 +1113,7 @@ function getPlayersInLeague() {
         bonus_group_exact_points: data.bonus_group_exact_points ?? 3,
         control_room_allowed_emails: data.control_room_allowed_emails ?? "",
       });
+      setControlRoomEmailsRaw(data.control_room_allowed_emails ?? "");
       setIsAdmin(data.owner_id === user.id);
     }
   }
@@ -1510,6 +1518,7 @@ function getPlayersInLeague() {
 
   function openLeague(league) {
     setSelectedLeague(league);
+    setControlRoomEmailsRaw(league.control_room_allowed_emails || "");
     setActiveTab("home");
     loadAllPredictions(league.id);
     loadLeagueParticipants(league.id);
@@ -2605,7 +2614,7 @@ function getPlayersInLeague() {
                 rows="3"
                 placeholder={t.controlRoomAllowedEmailsPlaceholder}
                 value={leagueSettings.control_room_allowed_emails || ""}
-                onChange={(e) => setLeagueSettings({ ...leagueSettings, control_room_allowed_emails: e.target.value })}
+                onChange={(e) => { setLeagueSettings({ ...leagueSettings, control_room_allowed_emails: e.target.value }); setControlRoomEmailsRaw(e.target.value); }}
               />
               <p className="bonus-help">{t.controlRoomAllowedEmailsHelp}</p>
             </div>
