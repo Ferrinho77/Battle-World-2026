@@ -1203,6 +1203,11 @@ function getPlayersInLeague() {
   }
 
   async function addGlobalAdminEmail() {
+    if (!isControlRoomOwner) {
+      setMessage("Solo il Super Admin può autorizzare altri Global Admin.");
+      return;
+    }
+
     const cleanEmail = String(newGlobalAdminEmail || "").trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes("@")) {
       setMessage("Inserisci una email valida.");
@@ -1224,6 +1229,11 @@ function getPlayersInLeague() {
   }
 
   async function removeGlobalAdminEmail(emailToRemove) {
+    if (!isControlRoomOwner) {
+      setMessage("Solo il Super Admin può rimuovere altri Global Admin.");
+      return;
+    }
+
     const cleanEmail = String(emailToRemove || "").trim().toLowerCase();
     if (!cleanEmail) return;
 
@@ -2974,44 +2984,52 @@ function getPlayersInLeague() {
           <>
             <div className="league-box owner-only-control-room-box">
               <h2>🌍 Global Control Room Admins</h2>
-              <p className="bonus-help">
-                Autorizza email globalmente alla Control Room. Questi utenti potranno entrare anche se non sono membri di nessuna lega.
-              </p>
-              <div className="admin-email-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <input
-                  type="email"
-                  placeholder="email@esempio.com"
-                  value={newGlobalAdminEmail}
-                  onChange={(e) => setNewGlobalAdminEmail(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") addGlobalAdminEmail(); }}
-                  style={{ flex: "1 1 260px" }}
-                />
-                <button type="button" className="btn green" onClick={addGlobalAdminEmail}>➕ Aggiungi Admin</button>
-                <button type="button" className="btn blue" onClick={loadAuthorizedAdmins}>🔄 Aggiorna</button>
-              </div>
-              <div className="participants-table-wrap" style={{ marginTop: 12 }}>
-                <table className="participants-table">
-                  <thead>
-                    <tr><th>Email autorizzata</th><th>Azione</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>{GLOBAL_CONTROL_ROOM_EMAIL} <strong>👑 Owner</strong></td>
-                      <td><span className="bonus-help">Protetta</span></td>
-                    </tr>
-                    {globalAdminsLoading && <tr><td colSpan="2">Caricamento...</td></tr>}
-                    {normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).map((adminEmail) => (
-                      <tr key={adminEmail}>
-                        <td>{adminEmail}</td>
-                        <td><button type="button" className="btn danger" onClick={() => removeGlobalAdminEmail(adminEmail)}>❌ Rimuovi</button></td>
-                      </tr>
-                    ))}
-                    {!globalAdminsLoading && normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).length === 0 && (
-                      <tr><td colSpan="2">Nessun altro Global Admin autorizzato.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              {isControlRoomOwner ? (
+                <>
+                  <p className="bonus-help">
+                    Solo il Super Admin può autorizzare o rimuovere email globalmente alla Control Room.
+                  </p>
+                  <div className="admin-email-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <input
+                      type="email"
+                      placeholder="email@esempio.com"
+                      value={newGlobalAdminEmail}
+                      onChange={(e) => setNewGlobalAdminEmail(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") addGlobalAdminEmail(); }}
+                      style={{ flex: "1 1 260px" }}
+                    />
+                    <button type="button" className="btn green" onClick={addGlobalAdminEmail}>➕ Aggiungi Admin</button>
+                    <button type="button" className="btn blue" onClick={loadAuthorizedAdmins}>🔄 Aggiorna</button>
+                  </div>
+                  <div className="participants-table-wrap" style={{ marginTop: 12 }}>
+                    <table className="participants-table">
+                      <thead>
+                        <tr><th>Email autorizzata</th><th>Azione</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>{GLOBAL_CONTROL_ROOM_EMAIL} <strong>👑 Super Admin</strong></td>
+                          <td><span className="bonus-help">Protetta</span></td>
+                        </tr>
+                        {globalAdminsLoading && <tr><td colSpan="2">Caricamento...</td></tr>}
+                        {normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).map((adminEmail) => (
+                          <tr key={adminEmail}>
+                            <td>{adminEmail}</td>
+                            <td><button type="button" className="btn danger" onClick={() => removeGlobalAdminEmail(adminEmail)}>❌ Rimuovi</button></td>
+                          </tr>
+                        ))}
+                        {!globalAdminsLoading && normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).length === 0 && (
+                          <tr><td colSpan="2">Nessun altro Global Admin autorizzato.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <p className="bonus-help">
+                  Sei autorizzato ad accedere alla Global Control Room, ma non puoi autorizzare o rimuovere altri Admin.
+                </p>
+              )}
             </div>
 
             <AdminPanel
@@ -3131,4 +3149,4 @@ function getPlayersInLeague() {
 
 export default App;
 
-// Step20E final - Global Admins separated from League Settings - force redeploy
+// Step20F - Only Super Admin can manage Global Admins
