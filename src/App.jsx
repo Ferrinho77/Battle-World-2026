@@ -82,6 +82,18 @@ function App() {
   const [globalAdminEmails, setGlobalAdminEmails] = useState([]);
   const [newGlobalAdminEmail, setNewGlobalAdminEmail] = useState("");
   const [globalAdminsLoading, setGlobalAdminsLoading] = useState(false);
+  const [globalDashboardLoading, setGlobalDashboardLoading] = useState(false);
+  const [globalDashboardStats, setGlobalDashboardStats] = useState({
+    users: 0,
+    leagues: 0,
+    leagueMembers: 0,
+    predictions: 0,
+    topScorerPredictions: 0,
+    bonusPredictions: 0,
+    authorizedAdmins: 0,
+    recentUsers: [],
+    recentLeagues: [],
+  });
   const [isAdmin, setIsAdmin] = useState(false);
   const [predictions, setPredictions] = useState({});
   const [missingPredictionFields, setMissingPredictionFields] = useState({});
@@ -368,6 +380,12 @@ function App() {
     const timer = setInterval(() => setNowTick(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (user && activeTab === "admin" && isGlobalControlRoomAdmin) {
+      loadGlobalDashboardStats();
+    }
+  }, [user, activeTab, isGlobalControlRoomAdmin]);
 
   const hasLiveMatches = Object.values(realResults || {}).some((result) => result && !result.finished);
 
@@ -1202,6 +1220,71 @@ function getPlayersInLeague() {
     setGlobalAdminEmails((data || []).map((row) => String(row.email || "").trim().toLowerCase()).filter(Boolean));
   }
 
+  async function getTableCount(tableName) {
+    const { count, error } = await supabase
+      .from(tableName)
+      .select("*", { count: "exact", head: true });
+
+    if (error) {
+      console.warn(`Global dashboard count error (${tableName}):`, error.message);
+      return 0;
+    }
+
+    return count || 0;
+  }
+
+  async function loadGlobalDashboardStats() {
+    if (!isGlobalControlRoomAdmin) return;
+
+    setGlobalDashboardLoading(true);
+
+    const [usersCount, leaguesCount, membersCount, predictionsCount, topScorerCount, bonusCount, adminsCount] = await Promise.all([
+      getTableCount("profiles"),
+      getTableCount("leagues"),
+      getTableCount("league_members"),
+      getTableCount("predictions"),
+      getTableCount("top_scorer_predictions"),
+      getTableCount("bonus_predictions"),
+      getTableCount("authorized_admins"),
+    ]);
+
+    const { data: recentUsers, error: recentUsersError } = await supabase
+      .from("profiles")
+      .select("id, username, email, created_at")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    const { data: recentLeagues, error: recentLeaguesError } = await supabase
+      .from("leagues")
+      .select("id, name, code, owner_id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (recentUsersError) console.warn("Recent users not available:", recentUsersError.message);
+    if (recentLeaguesError) console.warn("Recent leagues not available:", recentLeaguesError.message);
+
+    setGlobalDashboardStats({
+      users: usersCount,
+      leagues: leaguesCount,
+      leagueMembers: membersCount,
+      predictions: predictionsCount,
+      topScorerPredictions: topScorerCount,
+      bonusPredictions: bonusCount,
+      authorizedAdmins: adminsCount,
+      recentUsers: recentUsers || [],
+      recentLeagues: recentLeagues || [],
+    });
+
+    setGlobalDashboardLoading(false);
+  }
+
+  function formatGlobalDate(value) {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+    return date.toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
   async function addGlobalAdminEmail() {
     if (!isControlRoomOwner) {
       setMessage("Solo il Super Admin può autorizzare altri Global Admin.");
@@ -1230,7 +1313,7 @@ function getPlayersInLeague() {
 
   async function removeGlobalAdminEmail(emailToRemove) {
     if (!isControlRoomOwner) {
-      setMessage("Solo il Super Admin può rimuovere altri Global Admin.");
+      setMessage("Solo il Super Admin può rimuovere Global Admin.");
       return;
     }
 
@@ -2983,53 +3066,109 @@ function getPlayersInLeague() {
         {activeTab === "admin" && isGlobalControlRoomAdmin && (
           <>
             <div className="league-box owner-only-control-room-box">
-              <h2>🌍 Global Control Room Admins</h2>
-              {isControlRoomOwner ? (
-                <>
-                  <p className="bonus-help">
-                    Solo il Super Admin può autorizzare o rimuovere email globalmente alla Control Room.
-                  </p>
-                  <div className="admin-email-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <input
-                      type="email"
-                      placeholder="email@esempio.com"
-                      value={newGlobalAdminEmail}
-                      onChange={(e) => setNewGlobalAdminEmail(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") addGlobalAdminEmail(); }}
-                      style={{ flex: "1 1 260px" }}
-                    />
-                    <button type="button" className="btn green" onClick={addGlobalAdminEmail}>➕ Aggiungi Admin</button>
-                    <button type="button" className="btn blue" onClick={loadAuthorizedAdmins}>🔄 Aggiorna</button>
+              <h2>📊 Global Control Room Dashboard</h2>
+              <p className="bonus-help">
+                Panoramica generale dell'app: utenti, leghe, pronostici e autorizzazioni globali.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 14 }}>
+                {[
+                  ["👥 Utenti", globalDashboardStats.users],
+                  ["🏆 Leghe", globalDashboardStats.leagues],
+                  ["🤝 Membri Leghe", globalDashboardStats.leagueMembers],
+                  ["🎯 Pronostici", globalDashboardStats.predictions],
+                  ["🥾 Capocannoniere", globalDashboardStats.topScorerPredictions],
+                  ["⭐ Bonus", globalDashboardStats.bonusPredictions],
+                  ["🔐 Global Admin", globalDashboardStats.authorizedAdmins],
+                ].map(([label, value]) => (
+                  <div key={label} className="league-box" style={{ margin: 0, padding: 12 }}>
+                    <div className="bonus-help">{label}</div>
+                    <strong style={{ fontSize: 26 }}>{globalDashboardLoading ? "..." : value}</strong>
                   </div>
-                  <div className="participants-table-wrap" style={{ marginTop: 12 }}>
-                    <table className="participants-table">
-                      <thead>
-                        <tr><th>Email autorizzata</th><th>Azione</th></tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td>{GLOBAL_CONTROL_ROOM_EMAIL} <strong>👑 Super Admin</strong></td>
-                          <td><span className="bonus-help">Protetta</span></td>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+                <button type="button" className="btn blue" onClick={loadGlobalDashboardStats}>🔄 Aggiorna Dashboard</button>
+                <button type="button" className="btn blue" onClick={loadAuthorizedAdmins}>🔄 Aggiorna Admin</button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginTop: 14 }}>
+                <div className="participants-table-wrap">
+                  <h3>🆕 Ultimi utenti</h3>
+                  <table className="participants-table">
+                    <thead><tr><th>Utente</th><th>Email</th><th>Data</th></tr></thead>
+                    <tbody>
+                      {globalDashboardStats.recentUsers.map((profile) => (
+                        <tr key={profile.id}>
+                          <td>{profile.username || "-"}</td>
+                          <td>{profile.email || "-"}</td>
+                          <td>{formatGlobalDate(profile.created_at)}</td>
                         </tr>
-                        {globalAdminsLoading && <tr><td colSpan="2">Caricamento...</td></tr>}
-                        {normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).map((adminEmail) => (
-                          <tr key={adminEmail}>
-                            <td>{adminEmail}</td>
-                            <td><button type="button" className="btn danger" onClick={() => removeGlobalAdminEmail(adminEmail)}>❌ Rimuovi</button></td>
-                          </tr>
-                        ))}
-                        {!globalAdminsLoading && normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).length === 0 && (
-                          <tr><td colSpan="2">Nessun altro Global Admin autorizzato.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
+                      ))}
+                      {!globalDashboardLoading && globalDashboardStats.recentUsers.length === 0 && <tr><td colSpan="3">Nessun dato disponibile.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="participants-table-wrap">
+                  <h3>🏆 Ultime leghe</h3>
+                  <table className="participants-table">
+                    <thead><tr><th>Lega</th><th>Codice</th><th>Data</th></tr></thead>
+                    <tbody>
+                      {globalDashboardStats.recentLeagues.map((league) => (
+                        <tr key={league.id}>
+                          <td>{league.name || "-"}</td>
+                          <td>{league.code || "-"}</td>
+                          <td>{formatGlobalDate(league.created_at)}</td>
+                        </tr>
+                      ))}
+                      {!globalDashboardLoading && globalDashboardStats.recentLeagues.length === 0 && <tr><td colSpan="3">Nessun dato disponibile.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="league-box owner-only-control-room-box">
+              <h2>🌍 Global Control Room Admins</h2>
+              <p className="bonus-help">
+                I Global Admin possono entrare nella Control Room. Solo il Super Admin può aggiungere o rimuovere altri Global Admin.
+              </p>
+              {isControlRoomOwner ? (
+                <div className="admin-email-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    type="email"
+                    placeholder="email@esempio.com"
+                    value={newGlobalAdminEmail}
+                    onChange={(e) => setNewGlobalAdminEmail(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addGlobalAdminEmail(); }}
+                    style={{ flex: "1 1 260px" }}
+                  />
+                  <button type="button" className="btn green" onClick={addGlobalAdminEmail}>➕ Aggiungi Admin</button>
+                </div>
               ) : (
-                <p className="bonus-help">
-                  Sei autorizzato ad accedere alla Global Control Room, ma non puoi autorizzare o rimuovere altri Admin.
-                </p>
+                <div className="global-validation-alert">🔒 Sei Global Admin, ma non Super Admin: puoi usare la Control Room, ma non puoi autorizzare altri account.</div>
               )}
+              <div className="participants-table-wrap" style={{ marginTop: 12 }}>
+                <table className="participants-table">
+                  <thead>
+                    <tr><th>Email autorizzata</th><th>Azione</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{GLOBAL_CONTROL_ROOM_EMAIL} <strong>👑 Super Admin</strong></td>
+                      <td><span className="bonus-help">Protetta</span></td>
+                    </tr>
+                    {globalAdminsLoading && <tr><td colSpan="2">Caricamento...</td></tr>}
+                    {normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).map((adminEmail) => (
+                      <tr key={adminEmail}>
+                        <td>{adminEmail}</td>
+                        <td>{isControlRoomOwner ? <button type="button" className="btn danger" onClick={() => removeGlobalAdminEmail(adminEmail)}>❌ Rimuovi</button> : <span className="bonus-help">Solo lettura</span>}</td>
+                      </tr>
+                    ))}
+                    {!globalAdminsLoading && normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).length === 0 && (
+                      <tr><td colSpan="2">Nessun altro Global Admin autorizzato.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <AdminPanel
@@ -3149,4 +3288,4 @@ function getPlayersInLeague() {
 
 export default App;
 
-// Step20F - Only Super Admin can manage Global Admins
+// Step21 - Global Control Room Dashboard + Super Admin only authorization
