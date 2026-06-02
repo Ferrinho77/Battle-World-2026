@@ -1883,6 +1883,74 @@ function getPlayersInLeague() {
     };
   }
 
+
+  function countValues(values = []) {
+    const counts = {};
+    values.filter(Boolean).forEach((value) => {
+      counts[value] = (counts[value] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }
+
+  function getLeagueStatistics(rankingRows = []) {
+    const totalParticipants = getPlayersInLeague().length;
+    const participantRows = getLeagueParticipantRows();
+
+    const completedAllCount = participantRows.filter((participant) => {
+      const status = getParticipantCompletionStatus(participant);
+      return status.hasMatchPredictions &&
+        status.hasGoldenBoot &&
+        (!leagueSettings.enable_qualification_bonus || status.hasQualified) &&
+        (!leagueSettings.enable_group_positions_bonus || status.hasGroupRanking);
+    }).length;
+
+    const completionRate = totalParticipants ? Math.round((completedAllCount / totalParticipants) * 100) : 0;
+
+    const topScorerChoices = countValues(
+      allTopScorerPredictions.map((row) => row.player)
+    );
+
+    const championChoices = countValues(
+      allBonusPredictions
+        .filter((row) => row.prediction_type === "qualification" && row.prediction_key === "champion")
+        .map((row) => {
+          const val = row.prediction_value;
+          return Array.isArray(val) ? val[0] : val?.team || val?.value || val;
+        })
+    );
+
+    const qualifiedChoices = [];
+    allBonusPredictions
+      .filter((row) => row.prediction_type === "qualification" && row.prediction_key !== "champion")
+      .forEach((row) => {
+        const val = row.prediction_value;
+        if (Array.isArray(val)) qualifiedChoices.push(...val);
+        else if (Array.isArray(val?.teams)) qualifiedChoices.push(...val.teams);
+      });
+
+    const topQualifiedChoices = countValues(qualifiedChoices);
+
+    const leader = rankingRows[0] || null;
+    const exactLeader = [...rankingRows].sort((a, b) => (b.exact || 0) - (a.exact || 0))[0] || null;
+    const qualificationLeader = [...rankingRows].sort((a, b) => (b.qualificationBonus || 0) - (a.qualificationBonus || 0))[0] || null;
+    const groupLeader = [...rankingRows].sort((a, b) => (b.groupBonus || 0) - (a.groupBonus || 0))[0] || null;
+
+    return {
+      totalParticipants,
+      completedAllCount,
+      completionRate,
+      topScorerChoices,
+      championChoices,
+      topQualifiedChoices,
+      leader,
+      exactLeader,
+      qualificationLeader,
+      groupLeader,
+    };
+  }
+
   function getNextDeadlineInfo(nextMatch, tournamentStart) {
     const mode = leagueSettings.prediction_lock_mode || "match";
 
@@ -2015,6 +2083,7 @@ function getPlayersInLeague() {
   if (selectedLeague) {
     const ranking = getRanking();
     const dashboardStats = getLeagueDashboardStats(ranking);
+    const leagueStatistics = getLeagueStatistics(ranking);
     const users = getPlayersInLeague();
     const filteredPlayers = selectedPredictionPlayer === "__all__" ? users : users.filter((name) => name === selectedPredictionPlayer);
     const knockoutMatches = buildKnockoutMatches();
@@ -2055,6 +2124,7 @@ function getPlayersInLeague() {
       { key: "capocannoniere", icon: "🏆", label: t.topScorer },
       { key: "utenti", icon: "👥", label: t.usersPredictions },
       { key: "classifica", icon: "🥇", label: t.participantsRanking },
+      { key: "statistiche", icon: "📈", label: t.leagueStatistics },
       { key: "gironi", icon: "📋", label: t.groupRanking },
       { key: "tabellone", icon: "🧩", label: t.bracket },
       { key: "settings", icon: "⚙️", label: t.settings },
@@ -2146,7 +2216,79 @@ function getPlayersInLeague() {
           />
         )}
 
-        {activeTab === "regole" && <>
+        
+        {activeTab === "statistiche" && <>
+          <h2>📈 {t.leagueStatistics}</h2>
+          <div className="league-box stats-box">
+            <p className="rules-intro">{t.leagueStatisticsIntro}</p>
+
+            <h3>👥 {t.participationStats}</h3>
+            <div className="stats-grid">
+              <div className="stat-card-pro"><span>👥</span><strong>{leagueStatistics.totalParticipants}</strong><small>{t.totalParticipants}</small></div>
+              <div className="stat-card-pro"><span>✅</span><strong>{leagueStatistics.completedAllCount}</strong><small>{t.usersCompletedAll}</small></div>
+              <div className="stat-card-pro"><span>📊</span><strong>{leagueStatistics.completionRate}%</strong><small>{t.completionRate}</small></div>
+            </div>
+
+            <h3>🔥 {t.predictionStats}</h3>
+            <div className="stats-grid">
+              <div className="stat-card-pro big">
+                <span>🏆</span>
+                <strong>{leagueStatistics.championChoices[0]?.name || "-"}</strong>
+                <small>{t.championMostPicked}</small>
+                <em>{leagueStatistics.championChoices[0] ? formatText(t.pickedByUsers, { count: leagueStatistics.championChoices[0].count }) : t.noDataYet}</em>
+              </div>
+              <div className="stat-card-pro big">
+                <span>🥾</span>
+                <strong>{leagueStatistics.topScorerChoices[0]?.name || "-"}</strong>
+                <small>{t.goldenBootMostPicked}</small>
+                <em>{leagueStatistics.topScorerChoices[0] ? formatText(t.pickedByUsers, { count: leagueStatistics.topScorerChoices[0].count }) : t.noDataYet}</em>
+              </div>
+              <div className="stat-card-pro big">
+                <span>🎯</span>
+                <strong>{leagueStatistics.topQualifiedChoices[0]?.name || "-"}</strong>
+                <small>{t.qualifiedMostPicked}</small>
+                <em>{leagueStatistics.topQualifiedChoices[0] ? formatText(t.pickedByUsers, { count: leagueStatistics.topQualifiedChoices[0].count }) : t.noDataYet}</em>
+              </div>
+            </div>
+
+            <h3>🥇 {t.rankingStats}</h3>
+            <div className="stats-grid">
+              <div className="stat-card-pro"><span>🥇</span><strong>{leagueStatistics.leader?.name || "-"}</strong><small>{t.currentLeader}</small></div>
+              <div className="stat-card-pro"><span>🎯</span><strong>{leagueStatistics.exactLeader?.name || "-"}</strong><small>{t.exactLeader}</small></div>
+              <div className="stat-card-pro"><span>✅</span><strong>{leagueStatistics.qualificationLeader?.name || "-"}</strong><small>{t.qualificationLeader}</small></div>
+              <div className="stat-card-pro"><span>📊</span><strong>{leagueStatistics.groupLeader?.name || "-"}</strong><small>{t.groupLeader}</small></div>
+            </div>
+
+            <h3>📋 {t.topChoices}</h3>
+            <div className="table-wrapper">
+              <table className="stats-table">
+                <thead>
+                  <tr><th>🥾 {t.goldenBootMostPicked}</th><th>{t.pointsValue || "Count"}</th></tr>
+                </thead>
+                <tbody>
+                  {(leagueStatistics.topScorerChoices.slice(0, 10).length ? leagueStatistics.topScorerChoices.slice(0, 10) : [{ name: t.noDataYet, count: "-" }]).map((row) => (
+                    <tr key={`gb-${row.name}`}><td>{row.name}</td><td>{row.count}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="table-wrapper">
+              <table className="stats-table">
+                <thead>
+                  <tr><th>🏆 {t.championMostPicked}</th><th>{t.pointsValue || "Count"}</th></tr>
+                </thead>
+                <tbody>
+                  {(leagueStatistics.championChoices.slice(0, 10).length ? leagueStatistics.championChoices.slice(0, 10) : [{ name: t.noDataYet, count: "-" }]).map((row) => (
+                    <tr key={`champ-${row.name}`}><td>{row.name}</td><td>{row.count}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>}
+
+{activeTab === "regole" && <>
           <h2>📖 {t.rulesTitle}</h2>
           <div className="league-box rules-box smart-rules-box">
             <p className="rules-intro">{t.smartRulesIntro}</p>

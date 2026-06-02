@@ -4578,3 +4578,69 @@ input::placeholder {
     grid-column: 2;
   }
 }
+
+
+/* STEP 20C - league statistics */
+.stats-box {
+  display: grid;
+  gap: 14px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.stat-card-pro {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(88,166,255,.16);
+  box-shadow: 0 12px 28px rgba(0,0,0,.16);
+}
+
+.stat-card-pro span {
+  font-size: 24px;
+}
+
+.stat-card-pro strong {
+  color: #fff;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.stat-card-pro small {
+  color: #b9c9df;
+  font-weight: 900;
+}
+
+.stat-card-pro em {
+  color: #ffcf5e;
+  font-style: normal;
+  font-weight: 950;
+  font-size: 12px;
+}
+
+.stat-card-pro.big strong {
+  font-size: 17px;
+}
+
+.stats-table th,
+.stats-table td {
+  text-align: left;
+}
+
+.stats-table td:last-child,
+.stats-table th:last-child {
+  text-align: center;
+  font-weight: 950;
+}
+
+@media (max-width: 760px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
