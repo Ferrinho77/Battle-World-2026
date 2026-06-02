@@ -78,9 +78,7 @@ function App() {
     bonus_final_points: 8,
     bonus_champion_points: 15,
     bonus_group_exact_points: 3,
-    control_room_allowed_emails: "",
   });
-  const [controlRoomEmailsRaw, setControlRoomEmailsRaw] = useState("");
   const [globalAdminEmails, setGlobalAdminEmails] = useState([]);
   const [newGlobalAdminEmail, setNewGlobalAdminEmail] = useState("");
   const [globalAdminsLoading, setGlobalAdminsLoading] = useState(false);
@@ -120,22 +118,12 @@ function App() {
         );
   const t = translations[language] || translations.it;
   const currentUserEmail = String(user?.email || "").trim().toLowerCase();
-  const controlRoomEmailsSource =
-    controlRoomEmailsRaw ||
-    leagueSettings.control_room_allowed_emails ||
-    selectedLeague?.control_room_allowed_emails ||
-    "";
-  const controlRoomAllowedEmails = String(controlRoomEmailsSource)
-    .split(/[;,\n]/)
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
   const normalizedGlobalAdminEmails = globalAdminEmails.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean);
   const isControlRoomOwner = currentUserEmail === GLOBAL_CONTROL_ROOM_EMAIL;
   const isGlobalAdminFromTable = normalizedGlobalAdminEmails.includes(currentUserEmail);
   const isGlobalControlRoomAdmin =
     isControlRoomOwner ||
-    isGlobalAdminFromTable ||
-    controlRoomAllowedEmails.includes(currentUserEmail);
+    isGlobalAdminFromTable;
 
   function formatText(template, values = {}) {
     return String(template || "").replace(/\{(\w+)\}/g, (_, key) => values[key] ?? "");
@@ -1119,9 +1107,7 @@ function getPlayersInLeague() {
         bonus_final_points: data.bonus_final_points ?? 8,
         bonus_champion_points: data.bonus_champion_points ?? 15,
         bonus_group_exact_points: data.bonus_group_exact_points ?? 3,
-        control_room_allowed_emails: data.control_room_allowed_emails ?? "",
       });
-      setControlRoomEmailsRaw(data.control_room_allowed_emails ?? "");
       setIsAdmin(data.owner_id === user.id);
     }
   }
@@ -1189,9 +1175,9 @@ function getPlayersInLeague() {
     if (!validateLeagueSettings()) return;
 
     const settingsToSave = { ...leagueSettings };
-    if (currentUserEmail !== GLOBAL_CONTROL_ROOM_EMAIL) {
-      delete settingsToSave.control_room_allowed_emails;
-    }
+    // Step 20E: le email Control Room non sono più una configurazione di lega.
+    // Gli accessi globali si gestiscono solo dalla tabella authorized_admins.
+    delete settingsToSave.control_room_allowed_emails;
 
     const { error } = await supabase.from("leagues").update(settingsToSave).eq("id", selectedLeague.id);
     if (error) { setMessage(error.message); return; }
@@ -1604,7 +1590,6 @@ function getPlayersInLeague() {
 
   function openLeague(league) {
     setSelectedLeague(league);
-    setControlRoomEmailsRaw(league.control_room_allowed_emails || "");
     setActiveTab("home");
     loadAllPredictions(league.id);
     loadLeagueParticipants(league.id);
@@ -2692,19 +2677,6 @@ function getPlayersInLeague() {
             <p>{t.liveApiInfo}</p>
             <p><strong>{t.syncStatus}:</strong> {liveSyncStatus || t.waitingFirstSync}</p>
           </div>
-          {String(user?.email || "").toLowerCase() === "fabioferrigno1@hotmail.com" && (
-            <div className="league-box owner-only-control-room-box">
-              <h3>🛠️ {t.controlRoomAccess}</h3>
-              <label>{t.controlRoomAllowedEmails}</label>
-              <textarea
-                rows="3"
-                placeholder={t.controlRoomAllowedEmailsPlaceholder}
-                value={leagueSettings.control_room_allowed_emails || ""}
-                onChange={(e) => { setLeagueSettings({ ...leagueSettings, control_room_allowed_emails: e.target.value }); setControlRoomEmailsRaw(e.target.value); }}
-              />
-              <p className="bonus-help">{t.controlRoomAllowedEmailsHelp}</p>
-            </div>
-          )}
           <div className="league-box">
             <h3>⚽ {t.matchPointsSettings}</h3>
             <div className="bonus-settings-grid">
