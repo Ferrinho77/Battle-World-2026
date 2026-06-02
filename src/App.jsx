@@ -1924,6 +1924,93 @@ function getPlayersInLeague() {
     };
   }
 
+  function getSmartNotifications(knockoutMatches = [], nextDeadline = null) {
+    const notifications = [];
+    const allPredictionMatches = [...matches, ...knockoutMatches];
+
+    const editableMatches = allPredictionMatches.filter((match) => !isPredictionLocked(match));
+    const missingMatches = editableMatches.filter((match) => {
+      const p = predictions[match.id] || {};
+      return p.home_score === undefined || p.home_score === "" || p.away_score === undefined || p.away_score === "";
+    });
+
+    if (missingMatches.length > 0) {
+      notifications.push({
+        type: "warning",
+        icon: "⚽",
+        text: formatText(t.missingMatchPredictions, { count: missingMatches.length }),
+        tab: "partite",
+      });
+    }
+
+    if (!selectedTopScorer) {
+      notifications.push({
+        type: "warning",
+        icon: "🥾",
+        text: t.missingGoldenBoot,
+        tab: "capocannoniere",
+      });
+    }
+
+    if (leagueSettings.enable_qualification_bonus) {
+      const expected = qualificationRounds.reduce((sum, round) => sum + round.count, 0) + 1;
+      const completed = qualificationRounds.reduce((sum, round) => {
+        const value = getBonusValue("qualification", round.key);
+        return sum + (Array.isArray(value) ? value.filter(Boolean).length : 0);
+      }, getBonusValue("qualification", "champion") ? 1 : 0);
+
+      if (completed < expected) {
+        notifications.push({
+          type: "warning",
+          icon: "✅",
+          text: t.missingQualifiedPredictions,
+          tab: "passaggio-turno",
+        });
+      }
+    }
+
+    if (leagueSettings.enable_group_positions_bonus) {
+      const expected = groups.length * 4;
+      const completed = groups.reduce((sum, group) => {
+        const value = getBonusValue("group_position", group.name);
+        return sum + (Array.isArray(value) ? value.filter(Boolean).length : 0);
+      }, 0);
+
+      if (completed < expected) {
+        notifications.push({
+          type: "warning",
+          icon: "📊",
+          text: t.missingGroupRankingPredictions,
+          tab: "piazzamento-gironi",
+        });
+      }
+    }
+
+    if (nextDeadline?.date) {
+      const diffMs = new Date(nextDeadline.date).getTime() - Date.now();
+      if (!Number.isNaN(diffMs)) {
+        if (diffMs <= 0) {
+          notifications.push({
+            type: "danger",
+            icon: "🔒",
+            text: t.deadlineExpired,
+            tab: "partite",
+          });
+        } else if (diffMs <= 24 * 60 * 60 * 1000) {
+          notifications.push({
+            type: "danger",
+            icon: "⏳",
+            text: t.deadlineSoon,
+            tab: "partite",
+          });
+        }
+      }
+    }
+
+    return notifications;
+  }
+
+
 
   if (selectedLeague) {
     const ranking = getRanking();
@@ -1957,6 +2044,7 @@ function getPlayersInLeague() {
     const countdownTargetDate = leagueSettings.prediction_lock_mode === "tournament" ? tournamentStartDate : countdownTargetMatch?.kickoff;
     const countdownParts = getCountdownParts(countdownTargetDate);
     const nextDeadlineInfo = getNextDeadlineInfo(nextMatch, tournamentStartDate);
+    const smartNotifications = getSmartNotifications(knockoutMatches, nextDeadlineInfo);
     const menuItems = [
       { key: "home", icon: "🏠", label: t.leagueHome || t.leagueHome || "Home" },
       { key: "live", icon: "🔴", label: "Live Match Center" },
@@ -2038,6 +2126,7 @@ function getPlayersInLeague() {
           dashboardStats={dashboardStats}
           nextDeadlineInfo={nextDeadlineInfo}
           setActiveTab={setActiveTab}
+          smartNotifications={smartNotifications}
         />}
 
         {activeTab === "live" && (

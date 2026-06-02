@@ -21,6 +21,7 @@ export default function LeagueHome({
   dashboardStats,
   nextDeadlineInfo,
   setActiveTab,
+  smartNotifications = [],
 }) {
   const totalParticipants = dashboardStats?.totalParticipants || ranking.length || 0;
 
@@ -80,6 +81,28 @@ export default function LeagueHome({
           </small>
           {nextDeadlineInfo?.date && renderCountdownBox(countdownParts)}
         </div>
+      </div>
+
+      <div className="home-panel smart-notifications-panel">
+        <h3>🔔 {t.smartNotifications}</h3>
+        {smartNotifications.length === 0 ? (
+          <p className="all-good-message">✅ {t.allGood}</p>
+        ) : (
+          <div className="smart-notifications-list">
+            {smartNotifications.map((item, index) => (
+              <button
+                type="button"
+                key={`${item.text}-${index}`}
+                className={`smart-notification-item ${item.type || "warning"}`}
+                onClick={() => item.tab && setActiveTab?.(item.tab)}
+              >
+                <span>{item.icon}</span>
+                <strong>{item.text}</strong>
+                {item.tab && <em>{t.goCompleteNow}</em>}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="league-status-grid">

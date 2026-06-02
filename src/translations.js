@@ -417,7 +417,16 @@ export const translations = {
     "missingStatus": "Mancante",
     "owner": "Proprietario",
     "member": "Membro",
-    "adminRole": "Admin"
+    "adminRole": "Admin",
+    "smartNotifications": "Notifiche",
+    "allGood": "Tutto completato per ora",
+    "missingMatchPredictions": "Ti mancano {count} pronostici partite da compilare.",
+    "missingGoldenBoot": "Non hai ancora scelto il Golden Boot.",
+    "missingQualifiedPredictions": "Non hai ancora completato le Qualificate.",
+    "missingGroupRankingPredictions": "Non hai ancora completato la Classifica Gruppi.",
+    "deadlineSoon": "Attenzione: prossima scadenza entro 24 ore.",
+    "deadlineExpired": "La prossima scadenza risulta già chiusa.",
+    "goCompleteNow": "Completa ora"
   },
   "en": {
     "appTitle": "Battle World Cup 2026",
@@ -837,7 +846,16 @@ export const translations = {
     "missingStatus": "Missing",
     "owner": "Owner",
     "member": "Member",
-    "adminRole": "Admin"
+    "adminRole": "Admin",
+    "smartNotifications": "Notifications",
+    "allGood": "Everything is completed for now",
+    "missingMatchPredictions": "You still have {count} match predictions to complete.",
+    "missingGoldenBoot": "You have not selected your Golden Boot yet.",
+    "missingQualifiedPredictions": "You have not completed Qualified Teams yet.",
+    "missingGroupRankingPredictions": "You have not completed Group Rankings yet.",
+    "deadlineSoon": "Warning: the next deadline is within 24 hours.",
+    "deadlineExpired": "The next deadline appears to be closed.",
+    "goCompleteNow": "Complete now"
   },
   "ro": {
     "appTitle": "Battle World Cup 2026",
@@ -1257,6 +1275,15 @@ export const translations = {
     "missingStatus": "Lipsă",
     "owner": "Proprietar",
     "member": "Membru",
-    "adminRole": "Admin"
+    "adminRole": "Admin",
+    "smartNotifications": "Notificări",
+    "allGood": "Totul este completat momentan",
+    "missingMatchPredictions": "Îți lipsesc {count} predicții de meci de completat.",
+    "missingGoldenBoot": "Nu ai ales încă Golden Boot.",
+    "missingQualifiedPredictions": "Nu ai completat încă Echipele Calificate.",
+    "missingGroupRankingPredictions": "Nu ai completat încă Clasamentul Grupelor.",
+    "deadlineSoon": "Atenție: următoarea limită este în mai puțin de 24 de ore.",
+    "deadlineExpired": "Următoarea limită pare deja închisă.",
+    "goCompleteNow": "Completează acum"
   }
 };
