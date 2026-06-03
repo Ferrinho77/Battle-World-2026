@@ -1302,55 +1302,95 @@ function getPlayersInLeague() {
     const cleanSearch = String(searchValue || "").trim();
     setGlobalUsersLoading(true);
 
-    let query = supabase
-      .from("profiles")
-      .select("id, username, email, created_at")
-      .order("created_at", { ascending: false })
-      .limit(100);
+    try {
+      const pageSize = 1000;
+      let page = 0;
+      let profilesList = [];
+      let hasMore = true;
 
-    if (cleanSearch) {
-      const safeSearch = cleanSearch.replace(/[%,()]/g, "");
-      query = query.or(`username.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`);
-    }
+      while (hasMore) {
+        let query = supabase
+          .from("profiles")
+          .select("id, username, email, created_at")
+          .order("created_at", { ascending: false })
+          .range(page * pageSize, page * pageSize + pageSize - 1);
 
-    const { data: profilesData, error: profilesError } = await query;
+        if (cleanSearch) {
+          const safeSearch = cleanSearch.replace(/[%,()]/g, "");
+          query = query.or(`username.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`);
+        }
 
-    if (profilesError) {
-      setGlobalUsersLoading(false);
-      setMessage(profilesError.message);
-      return;
-    }
+        const { data, error } = await query;
+        if (error) throw error;
 
-    const profilesList = profilesData || [];
-    const userIds = profilesList.map((profile) => profile.id).filter(Boolean);
-    let membershipsByUser = {};
+        const rows = data || [];
+        profilesList = [...profilesList, ...rows];
+        hasMore = rows.length === pageSize;
+        page += 1;
+      }
 
-    if (userIds.length > 0) {
-      const { data: membershipsData, error: membershipsError } = await supabase
-        .from("league_members")
-        .select("user_id, role, league_id, leagues(name, code)")
-        .in("user_id", userIds);
+      const userIds = profilesList.map((profile) => profile.id).filter(Boolean);
+      let membershipsByUser = {};
 
-      if (!membershipsError) {
-        membershipsByUser = (membershipsData || []).reduce((acc, item) => {
-          const leagueName = item.leagues?.name || item.league_id || "Lega";
-          const leagueCode = item.leagues?.code ? ` (${item.leagues.code})` : "";
+      if (userIds.length > 0) {
+        const membershipRows = [];
+        for (let i = 0; i < userIds.length; i += 200) {
+          const chunk = userIds.slice(i, i + 200);
+          const { data, error } = await supabase
+            .from("league_members")
+            .select("user_id, role, league_id")
+            .in("user_id", chunk);
+
+          if (error) {
+            console.warn("Global users memberships not available:", error.message);
+          } else {
+            membershipRows.push(...(data || []));
+          }
+        }
+
+        const leagueIds = [...new Set(membershipRows.map((item) => item.league_id).filter(Boolean))];
+        const leaguesById = {};
+
+        if (leagueIds.length > 0) {
+          for (let i = 0; i < leagueIds.length; i += 200) {
+            const chunk = leagueIds.slice(i, i + 200);
+            const { data, error } = await supabase
+              .from("leagues")
+              .select("id, name, code")
+              .in("id", chunk);
+
+            if (error) {
+              console.warn("Global users leagues not available:", error.message);
+            } else {
+              (data || []).forEach((league) => {
+                leaguesById[league.id] = league;
+              });
+            }
+          }
+        }
+
+        membershipsByUser = membershipRows.reduce((acc, item) => {
+          const league = leaguesById[item.league_id];
+          const leagueName = league?.name || item.league_id || "Lega";
+          const leagueCode = league?.code ? ` (${league.code})` : "";
           const roleText = item.role ? ` - ${item.role}` : "";
           const label = `${leagueName}${leagueCode}${roleText}`;
           acc[item.user_id] = [...(acc[item.user_id] || []), label];
           return acc;
         }, {});
-      } else {
-        console.warn("Global users memberships not available:", membershipsError.message);
       }
-    }
 
-    setGlobalUsers(profilesList.map((profile) => ({
-      ...profile,
-      email: String(profile.email || "").trim().toLowerCase(),
-      memberships: membershipsByUser[profile.id] || [],
-    })));
-    setGlobalUsersLoading(false);
+      setGlobalUsers(profilesList.map((profile) => ({
+        ...profile,
+        email: String(profile.email || "").trim().toLowerCase(),
+        memberships: membershipsByUser[profile.id] || [],
+      })));
+    } catch (error) {
+      console.warn("Global users loading failed:", error.message);
+      setMessage(error.message);
+    } finally {
+      setGlobalUsersLoading(false);
+    }
   }
 
   async function authorizeProfileAsGlobalAdmin(email) {
