@@ -19,84 +19,6 @@ const LIVE_REFRESH_MS = 10 * 60 * 1000;
 const IDLE_REFRESH_MS = 60 * 60 * 1000;
 const GLOBAL_CONTROL_ROOM_EMAIL = "fabioferrigno1@hotmail.com";
 
-const MOBILE_CONTROL_ROOM_CSS = `
-@media (max-width: 768px) {
-  .owner-only-control-room-box,
-  .league-box,
-  .dashboard-action-box,
-  .card,
-  .page {
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  .owner-only-control-room-box {
-    overflow: hidden !important;
-  }
-
-  .owner-only-control-room-box h2,
-  .owner-only-control-room-box h3,
-  .bonus-help,
-  .global-validation-alert {
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-
-  .owner-only-control-room-box .participants-table-wrap,
-  .participants-table-wrap {
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch;
-    display: block !important;
-    box-sizing: border-box !important;
-    border-radius: 14px;
-  }
-
-  .owner-only-control-room-box .participants-table,
-  .participants-table {
-    width: max-content !important;
-    min-width: 560px !important;
-    table-layout: auto !important;
-  }
-
-  .owner-only-control-room-box .participants-table th,
-  .owner-only-control-room-box .participants-table td,
-  .participants-table th,
-  .participants-table td {
-    white-space: normal !important;
-    overflow-wrap: anywhere !important;
-    word-break: break-word !important;
-    vertical-align: top !important;
-    padding: 10px 12px !important;
-  }
-
-  .owner-only-control-room-box .participants-table td:nth-child(2),
-  .owner-only-control-room-box .participants-table th:nth-child(2) {
-    max-width: 210px !important;
-  }
-
-  .admin-email-row {
-    flex-direction: column !important;
-    align-items: stretch !important;
-  }
-
-  .admin-email-row input,
-  .admin-email-row button,
-  .owner-only-control-room-box .btn {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  .owner-only-control-room-box [style*="grid-template-columns"] {
-    grid-template-columns: 1fr !important;
-  }
-}
-`;
-
-
 function getNextSyncDate(intervalMs) {
   return new Date(Date.now() + intervalMs);
 }
@@ -2231,7 +2153,6 @@ ${targetEmail}`);
   if (resetMode) {
     return (
       <div className="page"><div className="card">
-      <style>{MOBILE_CONTROL_ROOM_CSS}</style>
         <img src={logo} alt="logo" className="logo" />
         <h1 className="app-title small-title">{t.resetPasswordTitle || "Reset Password"}</h1>
         <p className="bonus-help">{t.resetPasswordHelp || t.resetPasswordHelp}</p>
@@ -2247,7 +2168,6 @@ ${targetEmail}`);
   if (!user) {
     return (
       <div className="page"><div className="card">
-      <style>{MOBILE_CONTROL_ROOM_CSS}</style>
         <img src={logo} alt="logo" className="logo" />
         <h1 className="app-title login-title">{t.appTitle}</h1>
         <input placeholder={t.username} value={username} onChange={(e) => setPlayername(e.target.value)} />
@@ -2582,7 +2502,6 @@ ${targetEmail}`);
         quickSave={quickSave}
         onBack={() => { setSelectedLeague(null); setActiveTab("home"); }}
       >
-        <style>{MOBILE_CONTROL_ROOM_CSS}</style>
 
         {validationMessage && (
           <div className="global-validation-alert">
@@ -3308,7 +3227,32 @@ ${targetEmail}`);
         </>}
 
         {activeTab === "admin" && isGlobalControlRoomAdmin && (
-          <>
+          <div className="global-cr-mobile-fix">
+            <style>{`
+              @media (max-width: 700px) {
+                .global-cr-mobile-fix { width: 100%; max-width: 100%; overflow-x: hidden; }
+                .global-cr-mobile-fix .league-box { width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; }
+                .global-cr-mobile-fix .global-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+                .global-cr-mobile-fix .global-stat-card { padding: 10px !important; min-width: 0; }
+                .global-cr-mobile-fix .global-dashboard-lists { grid-template-columns: 1fr !important; }
+                .global-cr-mobile-fix .admin-email-row { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
+                .global-cr-mobile-fix .admin-email-row input,
+                .global-cr-mobile-fix .admin-email-row button,
+                .global-cr-mobile-fix .btn { width: 100%; max-width: 100%; box-sizing: border-box; }
+                .global-cr-mobile-fix .participants-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+                .global-cr-mobile-fix .participants-table { min-width: 640px; width: max-content; }
+                .global-cr-mobile-fix .global-users-table { min-width: 0 !important; width: 100% !important; }
+                .global-cr-mobile-fix .global-users-table thead { display: none; }
+                .global-cr-mobile-fix .global-users-table,
+                .global-cr-mobile-fix .global-users-table tbody,
+                .global-cr-mobile-fix .global-users-table tr,
+                .global-cr-mobile-fix .global-users-table td { display: block; width: 100%; box-sizing: border-box; }
+                .global-cr-mobile-fix .global-users-table tr { margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 10px; background: rgba(255,255,255,0.04); }
+                .global-cr-mobile-fix .global-users-table td { border: 0 !important; padding: 6px 0 !important; overflow-wrap: anywhere; }
+                .global-cr-mobile-fix .global-users-table td::before { content: attr(data-label); display: block; font-weight: 800; color: #9fb1c8; margin-bottom: 2px; }
+                .global-cr-mobile-fix .global-users-table td:last-child > div { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
+              }
+            `}</style>
             {isControlRoomOwner ? (
               <>
             <div className="league-box owner-only-control-room-box">
@@ -3316,7 +3260,7 @@ ${targetEmail}`);
               <p className="bonus-help">
                 Panoramica generale dell'app: utenti, leghe, pronostici e autorizzazioni globali.
               </p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 14 }}>
+              <div className="global-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 14 }}>
                 {[
                   ["👥 Utenti", globalDashboardStats.users],
                   ["🏆 Leghe", globalDashboardStats.leagues],
@@ -3326,7 +3270,7 @@ ${targetEmail}`);
                   ["⭐ Bonus", globalDashboardStats.bonusPredictions],
                   ["🔐 Global Admin", globalDashboardStats.authorizedAdmins],
                 ].map(([label, value]) => (
-                  <div key={label} className="league-box" style={{ margin: 0, padding: 12 }}>
+                  <div key={label} className="league-box global-stat-card" style={{ margin: 0, padding: 12 }}>
                     <div className="bonus-help">{label}</div>
                     <strong style={{ fontSize: 26 }}>{globalDashboardLoading ? "..." : value}</strong>
                   </div>
@@ -3336,7 +3280,7 @@ ${targetEmail}`);
                 <button type="button" className="btn blue" onClick={loadGlobalDashboardStats}>🔄 Aggiorna Dashboard</button>
                 <button type="button" className="btn blue" onClick={loadAuthorizedAdmins}>🔄 Aggiorna Admin</button>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginTop: 14 }}>
+              <div className="global-dashboard-lists" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginTop: 14 }}>
                 <div className="participants-table-wrap">
                   <h3>🆕 Ultimi utenti</h3>
                   <table className="participants-table">
@@ -3344,9 +3288,9 @@ ${targetEmail}`);
                     <tbody>
                       {globalDashboardStats.recentUsers.map((profile) => (
                         <tr key={profile.id}>
-                          <td>{profile.username || "-"}</td>
+                          <td data-label="Username">{profile.username || "-"}</td>
                           <td>{profile.email || "-"}</td>
-                          <td>{formatGlobalDate(profile.created_at)}</td>
+                          <td data-label="Registrazione">{formatGlobalDate(profile.created_at)}</td>
                         </tr>
                       ))}
                       {!globalDashboardLoading && globalDashboardStats.recentUsers.length === 0 && <tr><td colSpan="3">Nessun dato disponibile.</td></tr>}
@@ -3398,7 +3342,7 @@ ${targetEmail}`);
               )}
 
               <div className="participants-table-wrap" style={{ marginTop: 12 }}>
-                <table className="participants-table">
+                <table className="participants-table global-users-table">
                   <thead>
                     <tr>
                       <th>Username</th>
@@ -3419,11 +3363,11 @@ ${targetEmail}`);
                       return (
                         <tr key={profile.id}>
                           <td>{profile.username || "-"}</td>
-                          <td>{profileEmail || "-"}</td>
-                          <td>{profile.memberships.length > 0 ? profile.memberships.join(", ") : "Nessuna lega"}</td>
+                          <td data-label="Email">{profileEmail || "-"}</td>
+                          <td data-label="Leghe">{profile.memberships.length > 0 ? profile.memberships.join(", ") : "Nessuna lega"}</td>
                           <td>{formatGlobalDate(profile.created_at)}</td>
-                          <td>{isSuperAdminProfile ? "👑 Super Admin" : profileIsGlobalAdmin ? "🔐 Global Admin" : "Utente"}</td>
-                          <td>
+                          <td data-label="Stato">{isSuperAdminProfile ? "👑 Super Admin" : profileIsGlobalAdmin ? "🔐 Global Admin" : "Utente"}</td>
+                          <td data-label="Azione">
                             {isSuperAdminProfile ? (
                               <span className="bonus-help">Protetto</span>
                             ) : isControlRoomOwner ? (
@@ -3478,20 +3422,20 @@ ${targetEmail}`);
                 <div className="global-validation-alert">🔒 Sei Global Admin, ma non Super Admin: puoi usare la Control Room, ma non puoi autorizzare altri account.</div>
               )}
               <div className="participants-table-wrap" style={{ marginTop: 12 }}>
-                <table className="participants-table">
+                <table className="participants-table global-users-table">
                   <thead>
                     <tr><th>Email autorizzata</th><th>Azione</th></tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td>{GLOBAL_CONTROL_ROOM_EMAIL} <strong>👑 Super Admin</strong></td>
-                      <td><span className="bonus-help">Protetta</span></td>
+                      <td data-label="Email autorizzata">{GLOBAL_CONTROL_ROOM_EMAIL} <strong>👑 Super Admin</strong></td>
+                      <td data-label="Azione"><span className="bonus-help">Protetta</span></td>
                     </tr>
                     {globalAdminsLoading && <tr><td colSpan="2">Caricamento...</td></tr>}
                     {normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).map((adminEmail) => (
                       <tr key={adminEmail}>
-                        <td>{adminEmail}</td>
-                        <td>{isControlRoomOwner ? <button type="button" className="btn danger" onClick={() => removeGlobalAdminEmail(adminEmail)}>❌ Rimuovi</button> : <span className="bonus-help">Solo lettura</span>}</td>
+                        <td data-label="Email autorizzata">{adminEmail}</td>
+                        <td data-label="Azione">{isControlRoomOwner ? <button type="button" className="btn danger" onClick={() => removeGlobalAdminEmail(adminEmail)}>❌ Rimuovi</button> : <span className="bonus-help">Solo lettura</span>}</td>
                       </tr>
                     ))}
                     {!globalAdminsLoading && normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).length === 0 && (
@@ -3536,7 +3480,7 @@ ${targetEmail}`);
             setFinalTopScorer={setFinalTopScorer}
             saveFinalTopScorer={saveFinalTopScorer}
           />
-          </>
+          </div>
         )}
 
         <p>{message}</p>
@@ -3546,7 +3490,6 @@ ${targetEmail}`);
 
   return (
     <div className="page"><div className="card">
-      <style>{MOBILE_CONTROL_ROOM_CSS}</style>
       <img src={logo} alt="logo" className="logo" />
       <h1 className="app-title dashboard-title">{t.appTitle}</h1><p className="avatar-user"><AvatarBadge size="large" clickable /> <span>{t.user}: {username}</span></p>
       <button onClick={() => setShowDashboardSettings(!showDashboardSettings)} className="btn blue">{t.settings}</button>
