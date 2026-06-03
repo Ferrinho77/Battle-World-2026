@@ -3393,7 +3393,9 @@ ${targetEmail}`);
                 {globalUsersLoading && <div className="global-user-card">Caricamento utenti...</div>}
                 {!globalUsersLoading && globalUsers.map((profile) => {
                   const profileEmail = String(profile.email || "").trim().toLowerCase();
-                  const profileIsGlobalAdmin = isEmailGlobalAdmin(profileEmail);
+                  const loginEmail = (user?.email || "").toLowerCase().trim();
+                  const profileIsGlobalAdmin =
+                  isEmailGlobalAdmin(profileEmail) || isEmailGlobalAdmin(loginEmail);
                   const isSuperAdminProfile = profileEmail === GLOBAL_CONTROL_ROOM_EMAIL;
 
                   return (
