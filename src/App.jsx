@@ -1303,6 +1303,27 @@ function getPlayersInLeague() {
     setGlobalUsersLoading(true);
 
     try {
+      // Step 25: lettura utenti + leghe tramite RPC SECURITY DEFINER.
+      // Questo evita problemi di RLS/join e mostra correttamente le leghe nella Global Users Management.
+      const { data: rpcUsers, error: rpcError } = await supabase.rpc("get_global_users_with_leagues", {
+        search_text: cleanSearch || null,
+      });
+
+      if (!rpcError && Array.isArray(rpcUsers)) {
+        setGlobalUsers(rpcUsers.map((profile) => ({
+          id: profile.id,
+          username: profile.username,
+          email: String(profile.email || "").trim().toLowerCase(),
+          created_at: profile.created_at,
+          memberships: Array.isArray(profile.memberships) ? profile.memberships : [],
+        })));
+        return;
+      }
+
+      if (rpcError) {
+        console.warn("Global users RPC not available, using fallback:", rpcError.message);
+      }
+
       const pageSize = 1000;
       let page = 0;
       let profilesList = [];
