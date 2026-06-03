@@ -1808,7 +1808,11 @@ ${targetEmail}`);
   async function signIn() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setMessage(error.message); return; }
-    setPlayer(data.user); await loadProfile(data.user.id); loadLeagues(data.user.id); loadPredictions(data.user.id);
+    setPlayer(data.user);
+    await loadProfile(data.user.id);
+    await loadAuthorizedAdmins();
+    loadLeagues(data.user.id);
+    loadPredictions(data.user.id);
     setMessage(`${t.loginCompleted} ⚽`);
   }
 
@@ -3393,9 +3397,7 @@ ${targetEmail}`);
                 {globalUsersLoading && <div className="global-user-card">Caricamento utenti...</div>}
                 {!globalUsersLoading && globalUsers.map((profile) => {
                   const profileEmail = String(profile.email || "").trim().toLowerCase();
-                  const loginEmail = (user?.email || "").toLowerCase().trim();
-                  const profileIsGlobalAdmin =
-                  isEmailGlobalAdmin(profileEmail) || isEmailGlobalAdmin(loginEmail);
+                  const profileIsGlobalAdmin = isEmailGlobalAdmin(profileEmail);
                   const isSuperAdminProfile = profileEmail === GLOBAL_CONTROL_ROOM_EMAIL;
 
                   return (
@@ -3624,3 +3626,5 @@ ${targetEmail}`);
 export default App;
 
 // Step21 - Global Control Room Dashboard + Super Admin only authorization
+
+// Step23F - Final permissions and global admin access fix
