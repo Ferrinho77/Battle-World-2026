@@ -19,6 +19,84 @@ const LIVE_REFRESH_MS = 10 * 60 * 1000;
 const IDLE_REFRESH_MS = 60 * 60 * 1000;
 const GLOBAL_CONTROL_ROOM_EMAIL = "fabioferrigno1@hotmail.com";
 
+const MOBILE_CONTROL_ROOM_CSS = `
+@media (max-width: 768px) {
+  .owner-only-control-room-box,
+  .league-box,
+  .dashboard-action-box,
+  .card,
+  .page {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .owner-only-control-room-box {
+    overflow: hidden !important;
+  }
+
+  .owner-only-control-room-box h2,
+  .owner-only-control-room-box h3,
+  .bonus-help,
+  .global-validation-alert {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .owner-only-control-room-box .participants-table-wrap,
+  .participants-table-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    display: block !important;
+    box-sizing: border-box !important;
+    border-radius: 14px;
+  }
+
+  .owner-only-control-room-box .participants-table,
+  .participants-table {
+    width: max-content !important;
+    min-width: 560px !important;
+    table-layout: auto !important;
+  }
+
+  .owner-only-control-room-box .participants-table th,
+  .owner-only-control-room-box .participants-table td,
+  .participants-table th,
+  .participants-table td {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    vertical-align: top !important;
+    padding: 10px 12px !important;
+  }
+
+  .owner-only-control-room-box .participants-table td:nth-child(2),
+  .owner-only-control-room-box .participants-table th:nth-child(2) {
+    max-width: 210px !important;
+  }
+
+  .admin-email-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .admin-email-row input,
+  .admin-email-row button,
+  .owner-only-control-room-box .btn {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .owner-only-control-room-box [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+`;
+
+
 function getNextSyncDate(intervalMs) {
   return new Date(Date.now() + intervalMs);
 }
@@ -2153,6 +2231,7 @@ ${targetEmail}`);
   if (resetMode) {
     return (
       <div className="page"><div className="card">
+      <style>{MOBILE_CONTROL_ROOM_CSS}</style>
         <img src={logo} alt="logo" className="logo" />
         <h1 className="app-title small-title">{t.resetPasswordTitle || "Reset Password"}</h1>
         <p className="bonus-help">{t.resetPasswordHelp || t.resetPasswordHelp}</p>
@@ -2168,6 +2247,7 @@ ${targetEmail}`);
   if (!user) {
     return (
       <div className="page"><div className="card">
+      <style>{MOBILE_CONTROL_ROOM_CSS}</style>
         <img src={logo} alt="logo" className="logo" />
         <h1 className="app-title login-title">{t.appTitle}</h1>
         <input placeholder={t.username} value={username} onChange={(e) => setPlayername(e.target.value)} />
@@ -2502,6 +2582,7 @@ ${targetEmail}`);
         quickSave={quickSave}
         onBack={() => { setSelectedLeague(null); setActiveTab("home"); }}
       >
+        <style>{MOBILE_CONTROL_ROOM_CSS}</style>
 
         {validationMessage && (
           <div className="global-validation-alert">
@@ -3465,6 +3546,7 @@ ${targetEmail}`);
 
   return (
     <div className="page"><div className="card">
+      <style>{MOBILE_CONTROL_ROOM_CSS}</style>
       <img src={logo} alt="logo" className="logo" />
       <h1 className="app-title dashboard-title">{t.appTitle}</h1><p className="avatar-user"><AvatarBadge size="large" clickable /> <span>{t.user}: {username}</span></p>
       <button onClick={() => setShowDashboardSettings(!showDashboardSettings)} className="btn blue">{t.settings}</button>
