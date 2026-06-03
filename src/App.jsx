@@ -94,6 +94,10 @@ function App() {
     recentUsers: [],
     recentLeagues: [],
   });
+  const [globalUsersLoading, setGlobalUsersLoading] = useState(false);
+  const [globalUsersSearch, setGlobalUsersSearch] = useState("");
+  const [globalUsers, setGlobalUsers] = useState([]);
+  const [deleteUserLoadingId, setDeleteUserLoadingId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [predictions, setPredictions] = useState({});
   const [missingPredictionFields, setMissingPredictionFields] = useState({});
@@ -382,10 +386,11 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (user && activeTab === "admin" && isGlobalControlRoomAdmin) {
+    if (user && activeTab === "admin" && isControlRoomOwner) {
       loadGlobalDashboardStats();
+      loadGlobalUsers();
     }
-  }, [user, activeTab, isGlobalControlRoomAdmin]);
+  }, [user, activeTab, isControlRoomOwner]);
 
   const hasLiveMatches = Object.values(realResults || {}).some((result) => result && !result.finished);
 
@@ -1234,7 +1239,7 @@ function getPlayersInLeague() {
   }
 
   async function loadGlobalDashboardStats() {
-    if (!isGlobalControlRoomAdmin) return;
+    if (!isControlRoomOwner) return;
 
     setGlobalDashboardLoading(true);
 
@@ -1285,6 +1290,160 @@ function getPlayersInLeague() {
     return date.toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
+  function isEmailGlobalAdmin(email) {
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    if (!cleanEmail) return false;
+    return cleanEmail === GLOBAL_CONTROL_ROOM_EMAIL || normalizedGlobalAdminEmails.includes(cleanEmail);
+  }
+
+  async function loadGlobalUsers(searchValue = globalUsersSearch) {
+    if (!isControlRoomOwner) return;
+
+    const cleanSearch = String(searchValue || "").trim();
+    setGlobalUsersLoading(true);
+
+    let query = supabase
+      .from("profiles")
+      .select("id, username, email, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (cleanSearch) {
+      const safeSearch = cleanSearch.replace(/[%,()]/g, "");
+      query = query.or(`username.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`);
+    }
+
+    const { data: profilesData, error: profilesError } = await query;
+
+    if (profilesError) {
+      setGlobalUsersLoading(false);
+      setMessage(profilesError.message);
+      return;
+    }
+
+    const profilesList = profilesData || [];
+    const userIds = profilesList.map((profile) => profile.id).filter(Boolean);
+    let membershipsByUser = {};
+
+    if (userIds.length > 0) {
+      const { data: membershipsData, error: membershipsError } = await supabase
+        .from("league_members")
+        .select("user_id, role, league_id, leagues(name, code)")
+        .in("user_id", userIds);
+
+      if (!membershipsError) {
+        membershipsByUser = (membershipsData || []).reduce((acc, item) => {
+          const leagueName = item.leagues?.name || item.league_id || "Lega";
+          const leagueCode = item.leagues?.code ? ` (${item.leagues.code})` : "";
+          const roleText = item.role ? ` - ${item.role}` : "";
+          const label = `${leagueName}${leagueCode}${roleText}`;
+          acc[item.user_id] = [...(acc[item.user_id] || []), label];
+          return acc;
+        }, {});
+      } else {
+        console.warn("Global users memberships not available:", membershipsError.message);
+      }
+    }
+
+    setGlobalUsers(profilesList.map((profile) => ({
+      ...profile,
+      email: String(profile.email || "").trim().toLowerCase(),
+      memberships: membershipsByUser[profile.id] || [],
+    })));
+    setGlobalUsersLoading(false);
+  }
+
+  async function authorizeProfileAsGlobalAdmin(email) {
+    if (!isControlRoomOwner) {
+      setMessage("Solo il Super Admin può autorizzare altri Global Admin.");
+      return;
+    }
+
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      setMessage("Email utente non valida.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("authorized_admins")
+      .upsert({ email: cleanEmail }, { onConflict: "email" });
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    await loadAuthorizedAdmins();
+    await loadGlobalDashboardStats();
+    setMessage(`Global Admin autorizzato: ${cleanEmail} ✅`);
+  }
+
+  async function removeProfileGlobalAdmin(email) {
+    if (!isControlRoomOwner) {
+      setMessage("Solo il Super Admin può rimuovere Global Admin.");
+      return;
+    }
+
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    if (cleanEmail === GLOBAL_CONTROL_ROOM_EMAIL) {
+      setMessage("Questa email è il proprietario principale e non può essere rimossa dall'app.");
+      return;
+    }
+
+    await removeGlobalAdminEmail(cleanEmail);
+    await loadGlobalDashboardStats();
+  }
+
+  async function deleteGlobalUserComplete(profile) {
+    if (!isControlRoomOwner) {
+      setMessage("Solo il Super Admin può cancellare utenti.");
+      return;
+    }
+
+    const targetUserId = profile?.id;
+    const targetEmail = String(profile?.email || "").trim().toLowerCase();
+
+    if (!targetUserId || !targetEmail) {
+      setMessage("Utente non valido.");
+      return;
+    }
+
+    if (targetEmail === GLOBAL_CONTROL_ROOM_EMAIL || targetUserId === user?.id) {
+      setMessage("Questo account è protetto e non può essere cancellato dall'app.");
+      return;
+    }
+
+    const typedEmail = window.prompt(`Per cancellare definitivamente questo utente e tutti i suoi dati, riscrivi la sua email:
+
+${targetEmail}`);
+    if (String(typedEmail || "").trim().toLowerCase() !== targetEmail) {
+      setMessage("Cancellazione annullata: email non confermata.");
+      return;
+    }
+
+    setDeleteUserLoadingId(targetUserId);
+    const { data, error } = await supabase.functions.invoke("delete-user-complete", {
+      body: { user_id: targetUserId, email: targetEmail },
+    });
+    setDeleteUserLoadingId(null);
+
+    if (error) {
+      setMessage(error.message || "Errore durante la cancellazione utente.");
+      return;
+    }
+
+    if (data?.error) {
+      setMessage(data.error);
+      return;
+    }
+
+    await loadAuthorizedAdmins();
+    await loadGlobalDashboardStats();
+    await loadGlobalUsers(globalUsersSearch);
+    setMessage(`Utente cancellato definitivamente: ${targetEmail} ✅`);
+  }
+
   async function addGlobalAdminEmail() {
     if (!isControlRoomOwner) {
       setMessage("Solo il Super Admin può autorizzare altri Global Admin.");
@@ -1308,6 +1467,8 @@ function getPlayersInLeague() {
 
     setNewGlobalAdminEmail("");
     await loadAuthorizedAdmins();
+    await loadGlobalDashboardStats();
+    await loadGlobalUsers();
     setMessage(`Global Admin autorizzato: ${cleanEmail} ✅`);
   }
 
@@ -1339,6 +1500,8 @@ function getPlayersInLeague() {
     }
 
     await loadAuthorizedAdmins();
+    await loadGlobalDashboardStats();
+    await loadGlobalUsers();
     setMessage(`Global Admin rimosso: ${cleanEmail} ✅`);
   }
 
@@ -3065,6 +3228,8 @@ function getPlayersInLeague() {
 
         {activeTab === "admin" && isGlobalControlRoomAdmin && (
           <>
+            {isControlRoomOwner ? (
+              <>
             <div className="league-box owner-only-control-room-box">
               <h2>📊 Global Control Room Dashboard</h2>
               <p className="bonus-help">
@@ -3127,6 +3292,91 @@ function getPlayersInLeague() {
             </div>
 
             <div className="league-box owner-only-control-room-box">
+              <h2>👥 Global Users Management</h2>
+              <p className="bonus-help">
+                Cerca utenti registrati, controlla le leghe associate e gestisci lo stato Global Admin.
+                Le autorizzazioni possono essere modificate solo dal Super Admin.
+              </p>
+              <div className="admin-email-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+                <input
+                  type="text"
+                  placeholder="Cerca per email o username..."
+                  value={globalUsersSearch}
+                  onChange={(e) => setGlobalUsersSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") loadGlobalUsers(); }}
+                  style={{ flex: "1 1 260px" }}
+                />
+                <button type="button" className="btn blue" onClick={() => loadGlobalUsers()}>🔍 Cerca</button>
+                <button type="button" className="btn blue" onClick={() => { setGlobalUsersSearch(""); loadGlobalUsers(""); }}>🔄 Reset</button>
+              </div>
+
+              {!isControlRoomOwner && (
+                <div className="global-validation-alert" style={{ marginTop: 10 }}>
+                  🔒 Puoi consultare gli utenti, ma solo il Super Admin può autorizzare o rimuovere Global Admin.
+                </div>
+              )}
+
+              <div className="participants-table-wrap" style={{ marginTop: 12 }}>
+                <table className="participants-table">
+                  <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Leghe</th>
+                      <th>Registrazione</th>
+                      <th>Stato</th>
+                      <th>Azione</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {globalUsersLoading && <tr><td colSpan="6">Caricamento utenti...</td></tr>}
+                    {!globalUsersLoading && globalUsers.map((profile) => {
+                      const profileEmail = String(profile.email || "").trim().toLowerCase();
+                      const profileIsGlobalAdmin = isEmailGlobalAdmin(profileEmail);
+                      const isSuperAdminProfile = profileEmail === GLOBAL_CONTROL_ROOM_EMAIL;
+
+                      return (
+                        <tr key={profile.id}>
+                          <td>{profile.username || "-"}</td>
+                          <td>{profileEmail || "-"}</td>
+                          <td>{profile.memberships.length > 0 ? profile.memberships.join(", ") : "Nessuna lega"}</td>
+                          <td>{formatGlobalDate(profile.created_at)}</td>
+                          <td>{isSuperAdminProfile ? "👑 Super Admin" : profileIsGlobalAdmin ? "🔐 Global Admin" : "Utente"}</td>
+                          <td>
+                            {isSuperAdminProfile ? (
+                              <span className="bonus-help">Protetto</span>
+                            ) : isControlRoomOwner ? (
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                {profileIsGlobalAdmin ? (
+                                  <button type="button" className="btn danger" onClick={() => removeProfileGlobalAdmin(profileEmail)}>❌ Rimuovi Admin</button>
+                                ) : (
+                                  <button type="button" className="btn green" onClick={() => authorizeProfileAsGlobalAdmin(profileEmail)}>➕ Autorizza</button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="btn danger"
+                                  disabled={deleteUserLoadingId === profile.id}
+                                  onClick={() => deleteGlobalUserComplete(profile)}
+                                >
+                                  {deleteUserLoadingId === profile.id ? "Cancellazione..." : "🗑️ Cancella utente"}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="bonus-help">Solo lettura</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {!globalUsersLoading && globalUsers.length === 0 && (
+                      <tr><td colSpan="6">Nessun utente trovato.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="league-box owner-only-control-room-box">
               <h2>🌍 Global Control Room Admins</h2>
               <p className="bonus-help">
                 I Global Admin possono entrare nella Control Room. Solo il Super Admin può aggiungere o rimuovere altri Global Admin.
@@ -3170,6 +3420,16 @@ function getPlayersInLeague() {
                 </table>
               </div>
             </div>
+              </>
+            ) : (
+              <div className="league-box owner-only-control-room-box">
+                <h2>🔐 Global Control Room Operativa</h2>
+                <p className="bonus-help">
+                  Accesso limitato: puoi gestire solo partite, risultati, pronostici e classifiche.
+                  Non puoi vedere utenti, email, leghe o autorizzare altri admin.
+                </p>
+              </div>
+            )}
 
             <AdminPanel
             t={t}
