@@ -1302,118 +1302,55 @@ function getPlayersInLeague() {
     const cleanSearch = String(searchValue || "").trim();
     setGlobalUsersLoading(true);
 
-    try {
-      // Step 25: lettura utenti + leghe tramite RPC SECURITY DEFINER.
-      // Questo evita problemi di RLS/join e mostra correttamente le leghe nella Global Users Management.
-      const { data: rpcUsers, error: rpcError } = await supabase.rpc("get_global_users_with_leagues", {
-        search_text: cleanSearch || null,
-      });
+    let query = supabase
+      .from("profiles")
+      .select("id, username, email, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
 
-      if (!rpcError && Array.isArray(rpcUsers)) {
-        setGlobalUsers(rpcUsers.map((profile) => ({
-          id: profile.id,
-          username: profile.username,
-          email: String(profile.email || "").trim().toLowerCase(),
-          created_at: profile.created_at,
-          memberships: Array.isArray(profile.memberships) ? profile.memberships : [],
-        })));
-        return;
-      }
+    if (cleanSearch) {
+      const safeSearch = cleanSearch.replace(/[%,()]/g, "");
+      query = query.or(`username.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`);
+    }
 
-      if (rpcError) {
-        console.warn("Global users RPC not available, using fallback:", rpcError.message);
-      }
+    const { data: profilesData, error: profilesError } = await query;
 
-      const pageSize = 1000;
-      let page = 0;
-      let profilesList = [];
-      let hasMore = true;
+    if (profilesError) {
+      setGlobalUsersLoading(false);
+      setMessage(profilesError.message);
+      return;
+    }
 
-      while (hasMore) {
-        let query = supabase
-          .from("profiles")
-          .select("id, username, email, created_at")
-          .order("created_at", { ascending: false })
-          .range(page * pageSize, page * pageSize + pageSize - 1);
+    const profilesList = profilesData || [];
+    const userIds = profilesList.map((profile) => profile.id).filter(Boolean);
+    let membershipsByUser = {};
 
-        if (cleanSearch) {
-          const safeSearch = cleanSearch.replace(/[%,()]/g, "");
-          query = query.or(`username.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`);
-        }
+    if (userIds.length > 0) {
+      const { data: membershipsData, error: membershipsError } = await supabase
+        .from("league_members")
+        .select("user_id, role, league_id, leagues(name, code)")
+        .in("user_id", userIds);
 
-        const { data, error } = await query;
-        if (error) throw error;
-
-        const rows = data || [];
-        profilesList = [...profilesList, ...rows];
-        hasMore = rows.length === pageSize;
-        page += 1;
-      }
-
-      const userIds = profilesList.map((profile) => profile.id).filter(Boolean);
-      let membershipsByUser = {};
-
-      if (userIds.length > 0) {
-        const membershipRows = [];
-
-        // Lettura separata: è più affidabile della join embedded Supabase
-        // e risolve i casi in cui l'utente ha una lega ma veniva mostrato "Nessuna lega".
-        for (let i = 0; i < userIds.length; i += 200) {
-          const chunk = userIds.slice(i, i + 200);
-          const { data: membershipsData, error: membershipsError } = await supabase
-            .from("league_members")
-            .select("user_id, role, league_id")
-            .in("user_id", chunk);
-
-          if (membershipsError) {
-            console.warn("Global users memberships not available:", membershipsError.message);
-            continue;
-          }
-
-          membershipRows.push(...(membershipsData || []));
-        }
-
-        const leagueIds = Array.from(new Set(membershipRows.map((row) => row.league_id).filter(Boolean)));
-        const leaguesById = {};
-
-        for (let i = 0; i < leagueIds.length; i += 200) {
-          const chunk = leagueIds.slice(i, i + 200);
-          const { data: leaguesData, error: leaguesError } = await supabase
-            .from("leagues")
-            .select("id, name, code")
-            .in("id", chunk);
-
-          if (leaguesError) {
-            console.warn("Global users leagues not available:", leaguesError.message);
-            continue;
-          }
-
-          (leaguesData || []).forEach((league) => {
-            leaguesById[league.id] = league;
-          });
-        }
-
-        membershipsByUser = membershipRows.reduce((acc, item) => {
-          const league = leaguesById[item.league_id];
-          const leagueName = league?.name || item.league_id || "Lega";
-          const leagueCode = league?.code ? ` (${league.code})` : "";
+      if (!membershipsError) {
+        membershipsByUser = (membershipsData || []).reduce((acc, item) => {
+          const leagueName = item.leagues?.name || item.league_id || "Lega";
+          const leagueCode = item.leagues?.code ? ` (${item.leagues.code})` : "";
           const roleText = item.role ? ` - ${item.role}` : "";
           const label = `${leagueName}${leagueCode}${roleText}`;
           acc[item.user_id] = [...(acc[item.user_id] || []), label];
           return acc;
         }, {});
+      } else {
+        console.warn("Global users memberships not available:", membershipsError.message);
       }
-
-      setGlobalUsers(profilesList.map((profile) => ({
-        ...profile,
-        email: String(profile.email || "").trim().toLowerCase(),
-        memberships: membershipsByUser[profile.id] || [],
-      })));
-    } catch (error) {
-      setMessage(error.message || "Errore durante il caricamento degli utenti.");
-    } finally {
-      setGlobalUsersLoading(false);
     }
+
+    setGlobalUsers(profilesList.map((profile) => ({
+      ...profile,
+      email: String(profile.email || "").trim().toLowerCase(),
+      memberships: membershipsByUser[profile.id] || [],
+    })));
+    setGlobalUsersLoading(false);
   }
 
   async function authorizeProfileAsGlobalAdmin(email) {
@@ -1829,11 +1766,7 @@ ${targetEmail}`);
   async function signIn() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setMessage(error.message); return; }
-    setPlayer(data.user);
-    await loadProfile(data.user.id);
-    await loadAuthorizedAdmins();
-    loadLeagues(data.user.id);
-    loadPredictions(data.user.id);
+    setPlayer(data.user); await loadProfile(data.user.id); loadLeagues(data.user.id); loadPredictions(data.user.id);
     setMessage(`${t.loginCompleted} ⚽`);
   }
 
@@ -3296,7 +3229,7 @@ ${targetEmail}`);
         {activeTab === "admin" && isGlobalControlRoomAdmin && (
           <div className="global-cr-mobile-fix">
             <style>{`
-              @media (max-width: 900px) {
+              @media (max-width: 700px) {
                 .global-cr-mobile-fix { width: 100%; max-width: 100%; overflow-x: hidden; }
                 .global-cr-mobile-fix .league-box { width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; }
                 .global-cr-mobile-fix .global-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
@@ -3318,12 +3251,6 @@ ${targetEmail}`);
                 .global-cr-mobile-fix .global-users-table td { border: 0 !important; padding: 6px 0 !important; overflow-wrap: anywhere; }
                 .global-cr-mobile-fix .global-users-table td::before { content: attr(data-label); display: block; font-weight: 800; color: #9fb1c8; margin-bottom: 2px; }
                 .global-cr-mobile-fix .global-users-table td:last-child > div { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
-                .global-cr-mobile-fix .global-users-card-list { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
-                .global-cr-mobile-fix .global-user-card { width: 100%; max-width: 100%; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 12px; background: rgba(255,255,255,0.04); overflow: hidden; }
-                .global-cr-mobile-fix .global-user-card-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; padding: 5px 0; align-items: start; }
-                .global-cr-mobile-fix .global-user-card-label { font-weight: 800; color: #9fb1c8; }
-                .global-cr-mobile-fix .global-user-card-value { overflow-wrap: anywhere; min-width: 0; }
-                .global-cr-mobile-fix .global-user-card-actions { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; margin-top: 8px; }
               }
             `}</style>
             {isControlRoomOwner ? (
@@ -3414,65 +3341,65 @@ ${targetEmail}`);
                 </div>
               )}
 
-              <div className="global-users-card-list">
-                {globalUsersLoading && <div className="global-user-card">Caricamento utenti...</div>}
-                {!globalUsersLoading && globalUsers.map((profile) => {
-                  const profileEmail = String(profile.email || "").trim().toLowerCase();
-                  const profileIsGlobalAdmin = isEmailGlobalAdmin(profileEmail);
-                  const isSuperAdminProfile = profileEmail === GLOBAL_CONTROL_ROOM_EMAIL;
+              <div className="participants-table-wrap" style={{ marginTop: 12 }}>
+                <table className="participants-table global-users-table">
+                  <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Leghe</th>
+                      <th>Registrazione</th>
+                      <th>Stato</th>
+                      <th>Azione</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {globalUsersLoading && <tr><td colSpan="6">Caricamento utenti...</td></tr>}
+                    {!globalUsersLoading && globalUsers.map((profile) => {
+                      const profileEmail = String(profile.email || "").trim().toLowerCase();
+                      const profileIsGlobalAdmin = isEmailGlobalAdmin(profileEmail);
+                      const isSuperAdminProfile = profileEmail === GLOBAL_CONTROL_ROOM_EMAIL;
 
-                  return (
-                    <div className="global-user-card" key={profile.id}>
-                      <div className="global-user-card-row">
-                        <div className="global-user-card-label">Username</div>
-                        <div className="global-user-card-value">{profile.username || "-"}</div>
-                      </div>
-                      <div className="global-user-card-row">
-                        <div className="global-user-card-label">Email</div>
-                        <div className="global-user-card-value">{profileEmail || "-"}</div>
-                      </div>
-                      <div className="global-user-card-row">
-                        <div className="global-user-card-label">Leghe</div>
-                        <div className="global-user-card-value">{profile.memberships.length > 0 ? profile.memberships.join(", ") : "Nessuna lega"}</div>
-                      </div>
-                      <div className="global-user-card-row">
-                        <div className="global-user-card-label">Registrazione</div>
-                        <div className="global-user-card-value">{formatGlobalDate(profile.created_at)}</div>
-                      </div>
-                      <div className="global-user-card-row">
-                        <div className="global-user-card-label">Stato</div>
-                        <div className="global-user-card-value">{isSuperAdminProfile ? "👑 Super Admin" : profileIsGlobalAdmin ? "🔐 Global Admin" : "Utente"}</div>
-                      </div>
-                      <div className="global-user-card-actions">
-                        {isSuperAdminProfile ? (
-                          <span className="bonus-help">Protetto</span>
-                        ) : isControlRoomOwner ? (
-                          <>
-                            {profileIsGlobalAdmin ? (
-                              <button type="button" className="btn danger" onClick={() => removeProfileGlobalAdmin(profileEmail)}>❌ Rimuovi Admin</button>
+                      return (
+                        <tr key={profile.id}>
+                          <td>{profile.username || "-"}</td>
+                          <td data-label="Email">{profileEmail || "-"}</td>
+                          <td data-label="Leghe">{profile.memberships.length > 0 ? profile.memberships.join(", ") : "Nessuna lega"}</td>
+                          <td>{formatGlobalDate(profile.created_at)}</td>
+                          <td data-label="Stato">{isSuperAdminProfile ? "👑 Super Admin" : profileIsGlobalAdmin ? "🔐 Global Admin" : "Utente"}</td>
+                          <td data-label="Azione">
+                            {isSuperAdminProfile ? (
+                              <span className="bonus-help">Protetto</span>
+                            ) : isControlRoomOwner ? (
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                {profileIsGlobalAdmin ? (
+                                  <button type="button" className="btn danger" onClick={() => removeProfileGlobalAdmin(profileEmail)}>❌ Rimuovi Admin</button>
+                                ) : (
+                                  <button type="button" className="btn green" onClick={() => authorizeProfileAsGlobalAdmin(profileEmail)}>➕ Autorizza</button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="btn danger"
+                                  disabled={deleteUserLoadingId === profile.id}
+                                  onClick={() => deleteGlobalUserComplete(profile)}
+                                >
+                                  {deleteUserLoadingId === profile.id ? "Cancellazione..." : "🗑️ Cancella utente"}
+                                </button>
+                              </div>
                             ) : (
-                              <button type="button" className="btn green" onClick={() => authorizeProfileAsGlobalAdmin(profileEmail)}>➕ Autorizza</button>
+                              <span className="bonus-help">Solo lettura</span>
                             )}
-                            <button
-                              type="button"
-                              className="btn danger"
-                              disabled={deleteUserLoadingId === profile.id}
-                              onClick={() => deleteGlobalUserComplete(profile)}
-                            >
-                              {deleteUserLoadingId === profile.id ? "Cancellazione..." : "🗑️ Cancella utente"}
-                            </button>
-                          </>
-                        ) : (
-                          <span className="bonus-help">Solo lettura</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                {!globalUsersLoading && globalUsers.length === 0 && (
-                  <div className="global-user-card">Nessun utente trovato.</div>
-                )}
-              </div></div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {!globalUsersLoading && globalUsers.length === 0 && (
+                      <tr><td colSpan="6">Nessun utente trovato.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
             <div className="league-box owner-only-control-room-box">
               <h2>🌍 Global Control Room Admins</h2>
@@ -3619,7 +3546,7 @@ ${targetEmail}`);
       {isGlobalControlRoomAdmin && (
         <div className="dashboard-action-box owner-only-control-room-box">
           <h2>🌍 Global Control Room</h2>
-          <p className="bonus-help">Accesso globale: gli Admin autorizzati possono entrare nella Control Room anche senza appartenere a una lega. Gli Admin normali vedono solo la parte sportiva.</p>
+          <p className="bonus-help">Accesso globale: puoi gestire risultati live/finali e autorizzare nuove email Admin anche senza entrare in una lega.</p>
           <button type="button" onClick={openGlobalControlRoom} className="btn green">Apri Global Control Room</button>
         </div>
       )}
@@ -3647,5 +3574,3 @@ ${targetEmail}`);
 export default App;
 
 // Step21 - Global Control Room Dashboard + Super Admin only authorization
-
-// Step23F - Final permissions and global admin access fix
