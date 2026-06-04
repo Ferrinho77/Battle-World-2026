@@ -22,8 +22,33 @@ export default function AdminPanel({
   setFinalTopScorer,
   saveFinalTopScorer,
 }) {
+  const roundOrder = {
+    group: 0,
+    Sedicesimi: 1,
+    Ottavi: 2,
+    Quarti: 3,
+    Semifinali: 4,
+    "Finale 3° posto": 5,
+    Finale: 6,
+  };
+
+  const getMatchRoundKey = (match) => (match.round ? match.round : "group");
+
+  const getMatchGroupLabel = (match) => {
+    if (match.round) return match.round;
+    return match.group ? `${t.group || "Gruppo"} ${match.group}` : (t.groupStage || "Fase a gironi");
+  };
+
   const adminDisplayMatches = [...allDisplayMatches]
-    .sort((a, b) => new Date(a.kickoff || "2099-01-01") - new Date(b.kickoff || "2099-01-01"))
+    .sort((a, b) => {
+      const roundDiff = (roundOrder[getMatchRoundKey(a)] ?? 99) - (roundOrder[getMatchRoundKey(b)] ?? 99);
+      if (roundDiff !== 0) return roundDiff;
+
+      const groupDiff = String(a.group || "").localeCompare(String(b.group || ""));
+      if (groupDiff !== 0) return groupDiff;
+
+      return new Date(a.kickoff || "2099-01-01") - new Date(b.kickoff || "2099-01-01");
+    })
     .filter((match) => {
       const result = realResults[match.id];
       if (adminMatchFilter === "pending") return !result;
@@ -31,6 +56,33 @@ export default function AdminPanel({
       if (adminMatchFilter === "final") return result?.finished;
       return true;
     });
+
+  const groupedAdminMatches = adminDisplayMatches.reduce((groupsMap, match) => {
+    const roundKey = getMatchRoundKey(match);
+    const groupLabel = getMatchGroupLabel(match);
+    const key = match.round ? roundKey : `group-${match.group || "all"}`;
+
+    if (!groupsMap[key]) {
+      groupsMap[key] = {
+        key,
+        roundKey,
+        label: groupLabel,
+        matches: [],
+        order: roundOrder[roundKey] ?? 99,
+        group: match.group || "",
+      };
+    }
+
+    groupsMap[key].matches.push(match);
+    return groupsMap;
+  }, {});
+
+  const adminMatchSections = Object.values(groupedAdminMatches).sort((a, b) => {
+    if (a.order !== b.order) return a.order - b.order;
+    const groupDiff = String(a.group || "").localeCompare(String(b.group || ""));
+    if (groupDiff !== 0) return groupDiff;
+    return String(a.label).localeCompare(String(b.label));
+  });
 
   return (
     <>
@@ -74,35 +126,50 @@ export default function AdminPanel({
         <p className="bonus-help">Modalità locale: inserisci LIVE o FINAL manualmente. L’app aggiorna classifica, gironi e tabellone usando Supabase, senza API-Football a pagamento.</p>
       </div>
 
-      <div className="admin-match-grid">
-        {adminDisplayMatches.map((match) => {
-          const result = realResults[match.id];
-          const statusClass = result?.finished ? "admin-final" : result ? "admin-live" : "admin-pending";
-          const statusLabel = result?.finished ? "✅ FINAL" : result ? "🔴 LIVE" : "🟡 PENDING";
+      {adminMatchSections.map((section) => (
+        <div key={section.key} className="admin-round-section">
+          <h3 className="admin-round-title">
+            {section.roundKey === "group" ? "🏆" : section.roundKey === "Sedicesimi" ? "🥇" : section.roundKey === "Ottavi" ? "🥈" : section.roundKey === "Quarti" ? "🥉" : section.roundKey === "Semifinali" ? "🏅" : "🏆"} {section.label}
+          </h3>
 
-          return (
-            <div key={match.id} className={`match-box admin-match-card ${statusClass}`}>
-              <div className="admin-match-head">
-                <span>{statusLabel}</span>
-                <small>📅 {formatMatchDateTime(match)}</small>
-              </div>
+          <div className="admin-match-grid">
+            {section.matches.map((match) => {
+              const result = realResults[match.id];
+              const isFinal = !!result?.finished;
+              const statusClass = isFinal ? "admin-final" : result ? "admin-live" : "admin-pending";
+              const statusLabel = isFinal ? "✅ FINAL" : result ? "🔴 LIVE" : "🟡 PENDING";
 
-              <strong>{trTeamLabel(match.home)} - {trTeamLabel(match.away)}</strong>
-              {renderRealResult(match.id)}
+              return (
+                <div key={match.id} className={`match-box admin-match-card ${statusClass}`}>
+                  <div className="admin-match-head">
+                    <span>{statusLabel}</span>
+                    <small>📅 {formatMatchDateTime(match)}</small>
+                  </div>
 
-              <div className="score-row">
-                <input id={`rh-${match.id}`} type="number" min="0" max="20" placeholder={t.home} defaultValue={result?.home_score ?? ""} />
-                <input id={`ra-${match.id}`} type="number" min="0" max="20" placeholder={t.away} defaultValue={result?.away_score ?? ""} />
-              </div>
+                  <strong>{trTeamLabel(match.home)} - {trTeamLabel(match.away)}</strong>
+                  {renderRealResult(match.id)}
 
-              <div className="admin-actions-row">
-                <button className="btn blue" onClick={() => saveRealResult(match.id, document.getElementById(`rh-${match.id}`).value, document.getElementById(`ra-${match.id}`).value, false)}>{t.saveLiveResult}</button>
-                <button className="btn green" onClick={() => saveRealResult(match.id, document.getElementById(`rh-${match.id}`).value, document.getElementById(`ra-${match.id}`).value, true)}>{t.confirmFinalResult}</button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                  <div className="score-row">
+                    <input id={`rh-${match.id}`} type="number" min="0" max="20" placeholder={t.home} defaultValue={result?.home_score ?? ""} disabled={isFinal} />
+                    <input id={`ra-${match.id}`} type="number" min="0" max="20" placeholder={t.away} defaultValue={result?.away_score ?? ""} disabled={isFinal} />
+                  </div>
+
+                  {isFinal ? (
+                    <div className="admin-actions-row">
+                      <button className="btn green" disabled>🔒 {t.confirmed || "Confermato"}</button>
+                    </div>
+                  ) : (
+                    <div className="admin-actions-row">
+                      <button className="btn blue" onClick={() => saveRealResult(match.id, document.getElementById(`rh-${match.id}`).value, document.getElementById(`ra-${match.id}`).value, false)}>{t.saveLiveResult}</button>
+                      <button className="btn green" onClick={() => saveRealResult(match.id, document.getElementById(`rh-${match.id}`).value, document.getElementById(`ra-${match.id}`).value, true)}>{t.confirmFinalResult}</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
 
       <div className="admin-two-columns">
         <div className="league-box">

@@ -63,7 +63,7 @@ export default function ParticipantsRanking({
                 <th>SC</th>
                 <th>PT</th>
                 <th>PG</th>
-                <th>CC</th>
+                <th>GB</th>
               </tr>
             </thead>
             <tbody>

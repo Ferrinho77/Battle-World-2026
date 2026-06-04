@@ -1715,7 +1715,10 @@ ${targetEmail}`);
       setMessage(t.enterRealResult);
       return;
     }
-    const { error } = await supabase.from("real_results").upsert({ match_id: matchId, home_score: homeScore, away_score: awayScore, finished });
+    const { error } = await supabase.from("real_results").upsert(
+      { match_id: matchId, home_score: homeScore, away_score: awayScore, finished },
+      { onConflict: "match_id" }
+    );
     if (error) { setMessage(error.message); return; }
     await loadRealResults();
     await loadMatchEvents(true);
@@ -2143,12 +2146,15 @@ ${targetEmail}`);
     if (!topScorerGoalsPlayer) { setMessage(t.selectPlayerMessage); return; }
     if (topScorerGoals === "" || Number(topScorerGoals) < 0) { setMessage(t.enterRealResult); return; }
     const prefix = topScorerGoalsPrefix();
-    const { error } = await supabase.from("real_results").upsert({
-      match_id: `${prefix}${encodeTopScorer(topScorerGoalsPlayer)}`,
-      home_score: Number(topScorerGoals),
-      away_score: 0,
-      finished: false,
-    });
+    const { error } = await supabase.from("real_results").upsert(
+      {
+        match_id: `${prefix}${encodeTopScorer(topScorerGoalsPlayer)}`,
+        home_score: Number(topScorerGoals),
+        away_score: 0,
+        finished: false,
+      },
+      { onConflict: "match_id" }
+    );
     if (error) { setMessage(error.message); return; }
     await loadRealResults();
     setMessage(`${t.liveResultSaved}: ${topScorerGoalsPlayer} (${topScorerGoals}) 🔵`);
