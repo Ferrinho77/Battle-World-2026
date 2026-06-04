@@ -65,13 +65,13 @@ export default function AdminPanel({
             <option value="final">{t.finals || 'Finali'}</option>
           </select>
         </div>
-        <button className="btn blue" onClick={() => syncLiveResults(false)}>🌐 {t.syncLiveNow || 'Sincronizza risultati live ora'}</button>
+        <button className="btn blue" onClick={() => syncLiveResults(false)}>🔄 Aggiorna dati Supabase</button>
         <button className="btn blue" onClick={recalculateLeagueData}>🔄 {t.recalculateRanking || 'Ricalcola classifica'}</button>
       </div>
 
       <div className="admin-section-title">
         <h3>{t.insertRealResults}</h3>
-        <p className="bonus-help">{t.adminLiveInfo || 'I risultati LIVE aggiornano subito classifica partecipanti, classifica gironi e tabellone. I risultati FINAL rendono i punti definitivi.'}</p>
+        <p className="bonus-help">Modalità locale: inserisci LIVE o FINAL manualmente. L’app aggiorna classifica, gironi e tabellone usando Supabase, senza API-Football a pagamento.</p>
       </div>
 
       <div className="admin-match-grid">

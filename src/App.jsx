@@ -394,31 +394,15 @@ function App() {
 
   const hasLiveMatches = Object.values(realResults || {}).some((result) => result && !result.finished);
 
-  // Smart Live API Sync:
-  // - se ci sono partite LIVE: sincronizza ogni 10 minuti
-  // - se non ci sono partite LIVE: sincronizza ogni 1 ora
-  // - i dati vengono salvati/letti da Supabase, così l'app resta leggera e non consuma chiamate inutili.
+  // STEP 25C - Modalità gratuita 100% Supabase locale.
+  // API-Football non viene più chiamata automaticamente: risultati e live si gestiscono dalla Control Room.
   useEffect(() => {
     if (!user) return;
-    const refreshMs = hasLiveMatches ? LIVE_REFRESH_MS : IDLE_REFRESH_MS;
     setLiveSyncMode(hasLiveMatches ? "live" : "idle");
-    setNextLiveSyncAt(getNextSyncDate(refreshMs));
-    syncLiveResults(true, hasLiveMatches);
-  }, [user, selectedLeague?.id]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const refreshMs = hasLiveMatches ? LIVE_REFRESH_MS : IDLE_REFRESH_MS;
-    setLiveSyncMode(hasLiveMatches ? "live" : "idle");
-    setNextLiveSyncAt(getNextSyncDate(refreshMs));
-
-    const timer = setInterval(() => {
-      syncLiveResults(true, hasLiveMatches);
-      setNextLiveSyncAt(getNextSyncDate(refreshMs));
-    }, refreshMs);
-
-    return () => clearInterval(timer);
+    setNextLiveSyncAt(null);
+    loadRealResults(true);
+    loadMatchEvents(true);
+    setLiveSyncStatus("Modalità Supabase locale: nessuna API a pagamento attiva");
   }, [user, selectedLeague?.id, hasLiveMatches]);
 
   async function loadPlayers() {
@@ -1677,34 +1661,14 @@ ${targetEmail}`);
   }
 
   async function syncLiveResults(silent = false, liveMode = hasLiveMatches) {
-    try {
-      setLiveSyncStatus(silent ? "" : "Sincronizzazione live in corso...");
-      const refreshMs = liveMode ? LIVE_REFRESH_MS : IDLE_REFRESH_MS;
-      setLiveSyncMode(liveMode ? "live" : "idle");
-      setNextLiveSyncAt(getNextSyncDate(refreshMs));
-      const { data, error } = await supabase.functions.invoke("sync-live-results", {
-        body: {
-          league_id: selectedLeague?.__global ? null : (selectedLeague?.id || null),
-          mode: liveMode ? "live" : "idle",
-          interval_minutes: liveMode ? 10 : 60,
-          has_live_matches: Boolean(liveMode),
-        }
-      });
-      if (error) throw error;
-      await loadRealResults(true);
-      await loadMatchEvents(true);
-      const updated = data?.updated ?? 0;
-      const skipped = data?.skipped ?? 0;
-      setLiveSyncStatus(`Sync ${liveMode ? "LIVE" : "1H"} OK: ${updated} aggiornati${skipped ? `, ${skipped} non mappati` : ""}`);
-      if (!silent) setMessage("Risultati live sincronizzati ✅");
-    } catch (error) {
-      // Fallback: se Edge Function/API non è configurata, non blocchiamo l'app.
-      await loadRealResults(true);
-      await loadMatchEvents(true);
-      setLiveSyncStatus("Live API non configurata: uso risultati Control Room/Supabase");
-      setNextLiveSyncAt(getNextSyncDate(liveMode ? LIVE_REFRESH_MS : IDLE_REFRESH_MS));
-      if (!silent) setMessage(error?.message || "Live API non configurata");
-    }
+    // STEP 25C: il pulsante non chiama più API-Football.
+    // Serve solo ad aggiornare i dati locali salvati in Supabase dalla Control Room.
+    setLiveSyncMode(liveMode ? "live" : "idle");
+    setNextLiveSyncAt(null);
+    await loadRealResults(true);
+    await loadMatchEvents(true);
+    setLiveSyncStatus("Dati aggiornati da Supabase locale ✅");
+    if (!silent) setMessage("Dati locali Supabase aggiornati ✅");
   }
 
   async function loadRealResults(silent = false) {
