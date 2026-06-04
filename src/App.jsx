@@ -238,7 +238,9 @@ function App() {
     if (!result) return compact ? null : <p style={{ color: "#9fb1c8" }}>{t.realResult}: -</p>;
     const label = result.finished ? t.finalResult : t.liveResult;
     const status = result.finished ? `✅ ${t.confirmed}` : `🔵 ${t.live}`;
-    const content = `${label}: ${result.home_score} - ${result.away_score} ${status}`;
+    const winTypeLabel = result.win_type === "PENALTIES" ? "Rigori" : result.win_type === "EXTRA_TIME" ? "DTS" : "90'";
+    const qualifiedInfo = result.qualified_team ? ` | Qualificata: ${trTeamLabel(result.qualified_team)} (${winTypeLabel})` : "";
+    const content = `${label}: ${result.home_score} - ${result.away_score} ${status}${qualifiedInfo}`;
     return compact
       ? <small style={{ display: "block", color: result.finished ? "#18c964" : "#58a6ff", marginTop: 4 }}>{content}</small>
       : <p style={{ color: result.finished ? "#18c964" : "#58a6ff", fontWeight: "bold" }}>{content}</p>;
@@ -747,6 +749,7 @@ function getPlayersInLeague() {
         if (!source) return clean;
         const result = realResults[source.id];
         if (!result?.finished) return clean;
+        if (result.qualified_team) return result.qualified_team;
         if (Number(result.home_score) === Number(result.away_score)) return clean;
         return Number(result.home_score) > Number(result.away_score) ? source.home : source.away;
       }
@@ -757,6 +760,7 @@ function getPlayersInLeague() {
         if (!source) return clean;
         const result = realResults[source.id];
         if (!result?.finished) return clean;
+        if (result.qualified_team) return result.qualified_team === source.home ? source.away : source.home;
         if (Number(result.home_score) === Number(result.away_score)) return clean;
         return Number(result.home_score) > Number(result.away_score) ? source.away : source.home;
       }
@@ -793,14 +797,18 @@ function getPlayersInLeague() {
   function getWinnerFromMatch(matchId) {
     const ko = buildKnockoutMatches().find((m) => m.id === matchId);
     const result = realResults[matchId];
-    if (!ko || !result?.finished || Number(result.home_score) === Number(result.away_score)) return "";
+    if (!ko || !result?.finished) return "";
+    if (result.qualified_team) return result.qualified_team;
+    if (Number(result.home_score) === Number(result.away_score)) return "";
     return Number(result.home_score) > Number(result.away_score) ? ko.home : ko.away;
   }
 
   function getLoserFromMatch(matchId) {
     const ko = buildKnockoutMatches().find((m) => m.id === matchId);
     const result = realResults[matchId];
-    if (!ko || !result?.finished || Number(result.home_score) === Number(result.away_score)) return "";
+    if (!ko || !result?.finished) return "";
+    if (result.qualified_team) return result.qualified_team === ko.home ? ko.away : ko.home;
+    if (Number(result.home_score) === Number(result.away_score)) return "";
     return Number(result.home_score) > Number(result.away_score) ? ko.away : ko.home;
   }
 
@@ -1707,7 +1715,7 @@ ${targetEmail}`);
     setMatchEvents(formatted);
   }
 
-  async function saveRealResult(matchId, home, away, finished = true) {
+  async function saveRealResult(matchId, home, away, finished = true, qualifiedTeam = "", winType = "REGULAR") {
     if (home === "" || away === "") { setMessage(t.enterRealResult); return; }
     const homeScore = Number(home);
     const awayScore = Number(away);
@@ -1715,8 +1723,23 @@ ${targetEmail}`);
       setMessage(t.enterRealResult);
       return;
     }
+
+    const payload = {
+      match_id: matchId,
+      home_score: homeScore,
+      away_score: awayScore,
+      finished,
+    };
+
+    // Fase eliminazione: il risultato 90' serve per i pronostici,
+    // qualified_team serve per tabellone e bonus passaggio turno.
+    if (qualifiedTeam) {
+      payload.qualified_team = qualifiedTeam;
+      payload.win_type = winType || "REGULAR";
+    }
+
     const { error } = await supabase.from("real_results").upsert(
-      { match_id: matchId, home_score: homeScore, away_score: awayScore, finished },
+      payload,
       { onConflict: "match_id" }
     );
     if (error) { setMessage(error.message); return; }

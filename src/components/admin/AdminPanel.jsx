@@ -84,6 +84,48 @@ export default function AdminPanel({
     return String(a.label).localeCompare(String(b.label));
   });
 
+
+  const isKnockoutMatch = (match) => !!match.round;
+  const getInputValue = (id) => document.getElementById(id)?.value ?? "";
+  const getKnockoutQualifiedValue = (match) => {
+    const selected = getInputValue(`rq-${match.id}`);
+    if (selected) return selected;
+    const homeScore = Number(getInputValue(`rh-${match.id}`));
+    const awayScore = Number(getInputValue(`ra-${match.id}`));
+    if (Number.isFinite(homeScore) && Number.isFinite(awayScore)) {
+      if (homeScore > awayScore) return match.home;
+      if (awayScore > homeScore) return match.away;
+    }
+    return "";
+  };
+
+  const getKnockoutWinType = (match) => {
+    const homeScore = Number(getInputValue(`rh-${match.id}`));
+    const awayScore = Number(getInputValue(`ra-${match.id}`));
+    if (Number.isFinite(homeScore) && Number.isFinite(awayScore) && homeScore !== awayScore) return "REGULAR";
+    return getInputValue(`rwt-${match.id}`) || "EXTRA_TIME";
+  };
+
+  const saveAdminMatchResult = (match, finished) => {
+    const home = getInputValue(`rh-${match.id}`);
+    const away = getInputValue(`ra-${match.id}`);
+
+    if (!isKnockoutMatch(match)) {
+      saveRealResult(match.id, home, away, finished);
+      return;
+    }
+
+    const qualifiedTeam = finished ? getKnockoutQualifiedValue(match) : (getInputValue(`rq-${match.id}`) || "");
+    const winType = getKnockoutWinType(match);
+
+    if (finished && !qualifiedTeam) {
+      alert("Seleziona la squadra qualificata prima di confermare il risultato finale.");
+      return;
+    }
+
+    saveRealResult(match.id, home, away, finished, qualifiedTeam, winType);
+  };
+
   return (
     <>
       <h2>🛠️ {t.admin}</h2>
@@ -149,10 +191,31 @@ export default function AdminPanel({
                   <strong>{trTeamLabel(match.home)} - {trTeamLabel(match.away)}</strong>
                   {renderRealResult(match.id)}
 
+                  {isKnockoutMatch(match) && (
+                    <p className="bonus-help" style={{ marginTop: 8 }}>
+                      Risultato dopo i 90 minuti per i pronostici. La squadra qualificata serve per tabellone e bonus passaggio turno.
+                    </p>
+                  )}
+
                   <div className="score-row">
-                    <input id={`rh-${match.id}`} type="number" min="0" max="20" placeholder={t.home} defaultValue={result?.home_score ?? ""} disabled={isFinal} />
-                    <input id={`ra-${match.id}`} type="number" min="0" max="20" placeholder={t.away} defaultValue={result?.away_score ?? ""} disabled={isFinal} />
+                    <input id={`rh-${match.id}`} type="number" min="0" max="20" placeholder={isKnockoutMatch(match) ? `${t.home} 90'` : t.home} defaultValue={result?.home_score ?? ""} disabled={isFinal} />
+                    <input id={`ra-${match.id}`} type="number" min="0" max="20" placeholder={isKnockoutMatch(match) ? `${t.away} 90'` : t.away} defaultValue={result?.away_score ?? ""} disabled={isFinal} />
                   </div>
+
+                  {isKnockoutMatch(match) && (
+                    <div className="score-row">
+                      <select id={`rq-${match.id}`} defaultValue={result?.qualified_team || ""} disabled={isFinal}>
+                        <option value="">Qualificata</option>
+                        <option value={match.home}>{trTeamLabel(match.home)}</option>
+                        <option value={match.away}>{trTeamLabel(match.away)}</option>
+                      </select>
+                      <select id={`rwt-${match.id}`} defaultValue={result?.win_type || "REGULAR"} disabled={isFinal}>
+                        <option value="REGULAR">90'</option>
+                        <option value="EXTRA_TIME">DTS</option>
+                        <option value="PENALTIES">Rigori</option>
+                      </select>
+                    </div>
+                  )}
 
                   {isFinal ? (
                     <div className="admin-actions-row">
@@ -160,8 +223,8 @@ export default function AdminPanel({
                     </div>
                   ) : (
                     <div className="admin-actions-row">
-                      <button className="btn blue" onClick={() => saveRealResult(match.id, document.getElementById(`rh-${match.id}`).value, document.getElementById(`ra-${match.id}`).value, false)}>{t.saveLiveResult}</button>
-                      <button className="btn green" onClick={() => saveRealResult(match.id, document.getElementById(`rh-${match.id}`).value, document.getElementById(`ra-${match.id}`).value, true)}>{t.confirmFinalResult}</button>
+                      <button className="btn blue" onClick={() => saveAdminMatchResult(match, false)}>{t.saveLiveResult}</button>
+                      <button className="btn green" onClick={() => saveAdminMatchResult(match, true)}>{t.confirmFinalResult}</button>
                     </div>
                   )}
                 </div>
