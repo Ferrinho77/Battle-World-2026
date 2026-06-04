@@ -79,6 +79,8 @@ function App() {
     bonus_champion_points: 15,
     bonus_group_exact_points: 3,
   });
+  const [predictionLockControl, setPredictionLockControl] = useState({ lock_mode: "AUTO" });
+  const [predictionLockSaving, setPredictionLockSaving] = useState(false);
   const [globalAdminEmails, setGlobalAdminEmails] = useState([]);
   const [newGlobalAdminEmail, setNewGlobalAdminEmail] = useState("");
   const [globalAdminsLoading, setGlobalAdminsLoading] = useState(false);
@@ -427,6 +429,80 @@ function App() {
     setPlayersLoading(false);
   }
 
+  function getManualLockMode() {
+    return predictionLockControl?.lock_mode || "AUTO";
+  }
+
+  function getEffectiveNow() {
+    const mode = getManualLockMode();
+    if (mode === "TEST_STARTED") {
+      const start = getTournamentStartDate();
+      if (start) return new Date(new Date(start).getTime() + 60 * 1000);
+    }
+    return new Date();
+  }
+
+  function getPredictionLockModeLabel(mode = getManualLockMode()) {
+    const labels = {
+      AUTO: "Automatico calendario",
+      FORCE_LOCKED: "Forzato bloccato",
+      FORCE_UNLOCKED: "Forzato sbloccato",
+      TEST_STARTED: "Test: torneo iniziato",
+    };
+    return labels[mode] || labels.AUTO;
+  }
+
+  async function loadPredictionLockControl(leagueId) {
+    if (!leagueId) {
+      setPredictionLockControl({ lock_mode: "AUTO" });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("prediction_lock_control")
+      .select("lock_mode")
+      .eq("league_id", leagueId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("prediction_lock_control not available:", error.message);
+      setPredictionLockControl({ lock_mode: "AUTO" });
+      return;
+    }
+
+    setPredictionLockControl({ lock_mode: data?.lock_mode || "AUTO" });
+  }
+
+  async function savePredictionLockMode(mode) {
+    setPredictionLockControl({ lock_mode: mode });
+
+    if (!selectedLeague?.id || selectedLeague?.__global) {
+      setMessage(`Blocco pronostici: ${getPredictionLockModeLabel(mode)} ✅`);
+      return;
+    }
+
+    setPredictionLockSaving(true);
+    const { error } = await supabase
+      .from("prediction_lock_control")
+      .upsert(
+        {
+          league_id: selectedLeague.id,
+          lock_mode: mode,
+          updated_at: new Date().toISOString(),
+          updated_by: user?.id || null,
+        },
+        { onConflict: "league_id" }
+      );
+    setPredictionLockSaving(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage(`Blocco pronostici: ${getPredictionLockModeLabel(mode)} ✅`);
+  }
+
   function getRoundStartDate(roundName) {
     const allRoundMatches = buildKnockoutMatches().filter((m) => m.round === roundName && m.kickoff);
     const dates = allRoundMatches
@@ -468,13 +544,17 @@ function getPredictionLockText(match) {
       if (String(match?.id || "").startsWith("ko-")) return `Compilabile fino alla prima partita del turno ${trRoundName(match.round)}: ${label}`;
       return `Compilabile fino alla prima partita del torneo: ${label}`;
     }
-    return `${t.editableUntilMatchKickoff || "Compilabile fino al calcio d’inizio della partita:"} ${label}`;
+    return `{t.editableUntilMatchKickoff} ${label}`;
   }
 
   function isPredictionLocked(match) {
+    const mode = getManualLockMode();
+    if (mode === "FORCE_LOCKED") return true;
+    if (mode === "FORCE_UNLOCKED") return false;
+
     const lockDate = getPredictionLockDate(match);
     if (!lockDate) return false;
-    return new Date() >= new Date(lockDate);
+    return getEffectiveNow() >= new Date(lockDate);
   }
 
   function getCurrentKnockoutRoundForValidation(matchList = []) {
@@ -525,8 +605,12 @@ function getPredictionLockText(match) {
   }
 
   function isTournamentStarted() {
+    const mode = getManualLockMode();
+    if (mode === "FORCE_LOCKED" || mode === "TEST_STARTED") return true;
+    if (mode === "FORCE_UNLOCKED") return false;
+
     const start = getTournamentStartDate();
-    return !!start && new Date() >= start;
+    return !!start && getEffectiveNow() >= start;
   }
 
   function formatTournamentStart() {
@@ -836,6 +920,10 @@ function getPlayersInLeague() {
   }
 
   function setBonusValue(type, key, value) {
+    if (isTournamentStarted()) {
+      setMessage(`${t.predictionsLockedTournamentStarted} 🔒`);
+      return;
+    }
     setBonusPredictions({ ...bonusPredictions, [`${type}::${key}`]: value });
   }
 
@@ -1116,6 +1204,7 @@ function getPlayersInLeague() {
         bonus_group_exact_points: data.bonus_group_exact_points ?? 3,
       });
       setIsAdmin(data.owner_id === user.id);
+      await loadPredictionLockControl(leagueId);
     }
   }
 
@@ -1873,6 +1962,12 @@ ${targetEmail}`);
   }
 
   function updatePrediction(matchId, field, value) {
+    const match = [...matches, ...buildKnockoutMatches()].find((item) => item.id === matchId);
+    if (match && isPredictionLocked(match)) {
+      setMessage(`${t.predictionsLockedTournamentStarted || t.predictionsClosed || "Pronostici chiusi"} 🔒`);
+      return;
+    }
+
     setPredictions({ ...predictions, [matchId]: { ...predictions[matchId], [field]: normalizeScoreInput(value) } });
     setMissingPredictionFields((prev) => {
       const next = { ...prev };
@@ -2466,7 +2561,7 @@ ${targetEmail}`);
       { key: "partite", icon: "📊", label: t.groupPredictions },
       { key: "eliminazione", icon: "🌍", label: t.knockoutPredictions },
       { key: "passaggio-turno", icon: "🎯", label: t.qualificationStage || "Passaggio turno" },
-      { key: "piazzamento-gironi", icon: "📈", label: t.groupPlacement || "Piazzamenti Gruppi" },
+      { key: "piazzamento-gironi", icon: "📈", label: t.groupPlacement || "Piazzamento gironi" },
       { key: "capocannoniere", icon: "🏆", label: t.topScorer },
       { key: "utenti", icon: "👥", label: t.usersPredictions },
       { key: "classifica", icon: "🥇", label: t.participantsRanking },
@@ -3465,6 +3560,19 @@ ${targetEmail}`);
                 </p>
               </div>
             )}
+
+            <div className="league-box">
+              <h3>🔐 Controllo manuale blocco pronostici</h3>
+              <p className="bonus-help">
+                Modalità attuale: <strong>{getPredictionLockModeLabel()}</strong>. Usa questi pulsanti solo per test o emergenza se il blocco automatico calendario non funziona.
+              </p>
+              <div className="admin-actions-row" style={{ flexWrap: "wrap" }}>
+                <button className="btn blue" disabled={predictionLockSaving} onClick={() => savePredictionLockMode("AUTO")}>✅ Automatico calendario</button>
+                <button className="btn danger" disabled={predictionLockSaving} onClick={() => savePredictionLockMode("FORCE_LOCKED")}>🔒 Blocca tutto</button>
+                <button className="btn green" disabled={predictionLockSaving} onClick={() => savePredictionLockMode("FORCE_UNLOCKED")}>🔓 Sblocca tutto</button>
+                <button className="btn blue" disabled={predictionLockSaving} onClick={() => savePredictionLockMode("TEST_STARTED")}>🧪 Simula torneo iniziato</button>
+              </div>
+            </div>
 
             <AdminPanel
             t={t}
