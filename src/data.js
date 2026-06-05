@@ -13,95 +13,34 @@ export const groups = [
   { name: "Gruppo L", teams: ["🏴 England", "🇭🇷 Croatia", "🇬🇭 Ghana", "🇵🇦 Panama"] },
 ];
 
-const kickoffET = (date, time) => `${date}T${time}:00-04:00`;
+const startDate = new Date("2026-06-11T21:00:00");
 
-// Calendario ufficiale FIFA 2026 aggiornato dal PDF.
-// IMPORTANTE: gli ID m1...m72 sono mantenuti come nel vecchio data.js
-// per non scollegare i pronostici già salvati in Supabase.
-export const matches = [
-  { id: "m1", matchNumber: 1, stage: "group", group: "Gruppo A", date: "2026-06-11", kickoff: kickoffET("2026-06-11", "15:00"), home: "🇲🇽 Mexico", away: "🇿🇦 South Africa" },
-  { id: "m2", matchNumber: 2, stage: "group", group: "Gruppo A", date: "2026-06-11", kickoff: kickoffET("2026-06-11", "22:00"), home: "🇰🇷 South Korea", away: "🇨🇿 Czechia" },
-  { id: "m3", matchNumber: 28, stage: "group", group: "Gruppo A", date: "2026-06-18", kickoff: kickoffET("2026-06-18", "21:00"), home: "🇲🇽 Mexico", away: "🇰🇷 South Korea" },
-  { id: "m4", matchNumber: 25, stage: "group", group: "Gruppo A", date: "2026-06-18", kickoff: kickoffET("2026-06-18", "12:00"), home: "🇨🇿 Czechia", away: "🇿🇦 South Africa" },
-  { id: "m5", matchNumber: 53, stage: "group", group: "Gruppo A", date: "2026-06-24", kickoff: kickoffET("2026-06-24", "21:00"), home: "🇨🇿 Czechia", away: "🇲🇽 Mexico" },
-  { id: "m6", matchNumber: 54, stage: "group", group: "Gruppo A", date: "2026-06-24", kickoff: kickoffET("2026-06-24", "21:00"), home: "🇿🇦 South Africa", away: "🇰🇷 South Korea" },
-  { id: "m7", matchNumber: 3, stage: "group", group: "Gruppo B", date: "2026-06-12", kickoff: kickoffET("2026-06-12", "15:00"), home: "🇨🇦 Canada", away: "🇧🇦 Bosnia and Herzegovina" },
-  { id: "m8", matchNumber: 8, stage: "group", group: "Gruppo B", date: "2026-06-13", kickoff: kickoffET("2026-06-13", "15:00"), home: "🇶🇦 Qatar", away: "🇨🇭 Switzerland" },
-  { id: "m9", matchNumber: 27, stage: "group", group: "Gruppo B", date: "2026-06-18", kickoff: kickoffET("2026-06-18", "18:00"), home: "🇨🇦 Canada", away: "🇶🇦 Qatar" },
-  { id: "m10", matchNumber: 26, stage: "group", group: "Gruppo B", date: "2026-06-18", kickoff: kickoffET("2026-06-18", "15:00"), home: "🇨🇭 Switzerland", away: "🇧🇦 Bosnia and Herzegovina" },
-  { id: "m11", matchNumber: 51, stage: "group", group: "Gruppo B", date: "2026-06-24", kickoff: kickoffET("2026-06-24", "15:00"), home: "🇨🇭 Switzerland", away: "🇨🇦 Canada" },
-  { id: "m12", matchNumber: 52, stage: "group", group: "Gruppo B", date: "2026-06-24", kickoff: kickoffET("2026-06-24", "15:00"), home: "🇧🇦 Bosnia and Herzegovina", away: "🇶🇦 Qatar" },
-  { id: "m13", matchNumber: 29, stage: "group", group: "Gruppo C", date: "2026-06-19", kickoff: kickoffET("2026-06-19", "20:30"), home: "🇧🇷 Brazil", away: "🇭🇹 Haiti" },
-  { id: "m14", matchNumber: 30, stage: "group", group: "Gruppo C", date: "2026-06-19", kickoff: kickoffET("2026-06-19", "18:00"), home: "🇲🇦 Morocco", away: "🏴 Scotland", officialOrderReversed: true },
-  { id: "m15", matchNumber: 7, stage: "group", group: "Gruppo C", date: "2026-06-13", kickoff: kickoffET("2026-06-13", "18:00"), home: "🇧🇷 Brazil", away: "🇲🇦 Morocco" },
-  { id: "m16", matchNumber: 5, stage: "group", group: "Gruppo C", date: "2026-06-13", kickoff: kickoffET("2026-06-13", "21:00"), home: "🏴 Scotland", away: "🇭🇹 Haiti", officialOrderReversed: true },
-  { id: "m17", matchNumber: 49, stage: "group", group: "Gruppo C", date: "2026-06-24", kickoff: kickoffET("2026-06-24", "18:00"), home: "🏴 Scotland", away: "🇧🇷 Brazil" },
-  { id: "m18", matchNumber: 50, stage: "group", group: "Gruppo C", date: "2026-06-24", kickoff: kickoffET("2026-06-24", "18:00"), home: "🇭🇹 Haiti", away: "🇲🇦 Morocco", officialOrderReversed: true },
-  { id: "m19", matchNumber: 32, stage: "group", group: "Gruppo D", date: "2026-06-19", kickoff: kickoffET("2026-06-19", "15:00"), home: "🇺🇸 United States", away: "🇦🇺 Australia" },
-  { id: "m20", matchNumber: 31, stage: "group", group: "Gruppo D", date: "2026-06-19", kickoff: kickoffET("2026-06-19", "23:00"), home: "🇵🇾 Paraguay", away: "🇹🇷 Türkiye", officialOrderReversed: true },
-  { id: "m21", matchNumber: 4, stage: "group", group: "Gruppo D", date: "2026-06-12", kickoff: kickoffET("2026-06-12", "21:00"), home: "🇺🇸 United States", away: "🇵🇾 Paraguay" },
-  { id: "m22", matchNumber: 6, stage: "group", group: "Gruppo D", date: "2026-06-13", kickoff: kickoffET("2026-06-13", "00:00"), home: "🇹🇷 Türkiye", away: "🇦🇺 Australia", officialOrderReversed: true },
-  { id: "m23", matchNumber: 59, stage: "group", group: "Gruppo D", date: "2026-06-25", kickoff: kickoffET("2026-06-25", "22:00"), home: "🇹🇷 Türkiye", away: "🇺🇸 United States" },
-  { id: "m24", matchNumber: 60, stage: "group", group: "Gruppo D", date: "2026-06-25", kickoff: kickoffET("2026-06-25", "22:00"), home: "🇦🇺 Australia", away: "🇵🇾 Paraguay", officialOrderReversed: true },
-  { id: "m25", matchNumber: 34, stage: "group", group: "Gruppo E", date: "2026-06-20", kickoff: kickoffET("2026-06-20", "20:00"), home: "🇨🇼 Curaçao", away: "🇪🇨 Ecuador", officialOrderReversed: true },
-  { id: "m26", matchNumber: 33, stage: "group", group: "Gruppo E", date: "2026-06-20", kickoff: kickoffET("2026-06-20", "16:00"), home: "🇩🇪 Germany", away: "🇨🇮 Ivory Coast" },
-  { id: "m27", matchNumber: 10, stage: "group", group: "Gruppo E", date: "2026-06-14", kickoff: kickoffET("2026-06-14", "13:00"), home: "🇨🇼 Curaçao", away: "🇩🇪 Germany", officialOrderReversed: true },
-  { id: "m28", matchNumber: 9, stage: "group", group: "Gruppo E", date: "2026-06-14", kickoff: kickoffET("2026-06-14", "19:00"), home: "🇨🇮 Ivory Coast", away: "🇪🇨 Ecuador" },
-  { id: "m29", matchNumber: 55, stage: "group", group: "Gruppo E", date: "2026-06-25", kickoff: kickoffET("2026-06-25", "16:00"), home: "🇨🇮 Ivory Coast", away: "🇨🇼 Curaçao", officialOrderReversed: true },
-  { id: "m30", matchNumber: 56, stage: "group", group: "Gruppo E", date: "2026-06-25", kickoff: kickoffET("2026-06-25", "16:00"), home: "🇪🇨 Ecuador", away: "🇩🇪 Germany" },
-  { id: "m31", matchNumber: 11, stage: "group", group: "Gruppo F", date: "2026-06-14", kickoff: kickoffET("2026-06-14", "16:00"), home: "🇳🇱 Netherlands", away: "🇯🇵 Japan" },
-  { id: "m32", matchNumber: 12, stage: "group", group: "Gruppo F", date: "2026-06-14", kickoff: kickoffET("2026-06-14", "22:00"), home: "🇸🇪 Sweden", away: "🇹🇳 Tunisia" },
-  { id: "m33", matchNumber: 35, stage: "group", group: "Gruppo F", date: "2026-06-20", kickoff: kickoffET("2026-06-20", "13:00"), home: "🇳🇱 Netherlands", away: "🇸🇪 Sweden" },
-  { id: "m34", matchNumber: 36, stage: "group", group: "Gruppo F", date: "2026-06-20", kickoff: kickoffET("2026-06-20", "00:00"), home: "🇹🇳 Tunisia", away: "🇯🇵 Japan" },
-  { id: "m35", matchNumber: 58, stage: "group", group: "Gruppo F", date: "2026-06-25", kickoff: kickoffET("2026-06-25", "19:00"), home: "🇹🇳 Tunisia", away: "🇳🇱 Netherlands" },
-  { id: "m36", matchNumber: 57, stage: "group", group: "Gruppo F", date: "2026-06-25", kickoff: kickoffET("2026-06-25", "19:00"), home: "🇯🇵 Japan", away: "🇸🇪 Sweden" },
-  { id: "m37", matchNumber: 16, stage: "group", group: "Gruppo G", date: "2026-06-15", kickoff: kickoffET("2026-06-15", "15:00"), home: "🇧🇪 Belgium", away: "🇪🇬 Egypt" },
-  { id: "m38", matchNumber: 15, stage: "group", group: "Gruppo G", date: "2026-06-15", kickoff: kickoffET("2026-06-15", "21:00"), home: "🇮🇷 Iran", away: "🇳🇿 New Zealand" },
-  { id: "m39", matchNumber: 39, stage: "group", group: "Gruppo G", date: "2026-06-21", kickoff: kickoffET("2026-06-21", "15:00"), home: "🇧🇪 Belgium", away: "🇮🇷 Iran" },
-  { id: "m40", matchNumber: 40, stage: "group", group: "Gruppo G", date: "2026-06-21", kickoff: kickoffET("2026-06-21", "21:00"), home: "🇳🇿 New Zealand", away: "🇪🇬 Egypt" },
-  { id: "m41", matchNumber: 64, stage: "group", group: "Gruppo G", date: "2026-06-26", kickoff: kickoffET("2026-06-26", "23:00"), home: "🇳🇿 New Zealand", away: "🇧🇪 Belgium" },
-  { id: "m42", matchNumber: 63, stage: "group", group: "Gruppo G", date: "2026-06-26", kickoff: kickoffET("2026-06-26", "23:00"), home: "🇪🇬 Egypt", away: "🇮🇷 Iran" },
-  { id: "m43", matchNumber: 65, stage: "group", group: "Gruppo H", date: "2026-06-26", kickoff: kickoffET("2026-06-26", "20:00"), home: "🇨🇻 Cape Verde", away: "🇸🇦 Saudi Arabia" },
-  { id: "m44", matchNumber: 66, stage: "group", group: "Gruppo H", date: "2026-06-26", kickoff: kickoffET("2026-06-26", "20:00"), home: "🇪🇸 Spain", away: "🇺🇾 Uruguay", officialOrderReversed: true },
-  { id: "m45", matchNumber: 14, stage: "group", group: "Gruppo H", date: "2026-06-15", kickoff: kickoffET("2026-06-15", "12:00"), home: "🇨🇻 Cape Verde", away: "🇪🇸 Spain", officialOrderReversed: true },
-  { id: "m46", matchNumber: 13, stage: "group", group: "Gruppo H", date: "2026-06-15", kickoff: kickoffET("2026-06-15", "18:00"), home: "🇺🇾 Uruguay", away: "🇸🇦 Saudi Arabia", officialOrderReversed: true },
-  { id: "m47", matchNumber: 37, stage: "group", group: "Gruppo H", date: "2026-06-21", kickoff: kickoffET("2026-06-21", "18:00"), home: "🇺🇾 Uruguay", away: "🇨🇻 Cape Verde" },
-  { id: "m48", matchNumber: 38, stage: "group", group: "Gruppo H", date: "2026-06-21", kickoff: kickoffET("2026-06-21", "12:00"), home: "🇸🇦 Saudi Arabia", away: "🇪🇸 Spain", officialOrderReversed: true },
-  { id: "m49", matchNumber: 61, stage: "group", group: "Gruppo I", date: "2026-06-26", kickoff: kickoffET("2026-06-26", "15:00"), home: "🇫🇷 France", away: "🇳🇴 Norway", officialOrderReversed: true },
-  { id: "m50", matchNumber: 62, stage: "group", group: "Gruppo I", date: "2026-06-26", kickoff: kickoffET("2026-06-26", "15:00"), home: "🇸🇳 Senegal", away: "🇮🇶 Iraq" },
-  { id: "m51", matchNumber: 17, stage: "group", group: "Gruppo I", date: "2026-06-16", kickoff: kickoffET("2026-06-16", "15:00"), home: "🇫🇷 France", away: "🇸🇳 Senegal" },
-  { id: "m52", matchNumber: 18, stage: "group", group: "Gruppo I", date: "2026-06-16", kickoff: kickoffET("2026-06-16", "18:00"), home: "🇮🇶 Iraq", away: "🇳🇴 Norway" },
-  { id: "m53", matchNumber: 42, stage: "group", group: "Gruppo I", date: "2026-06-22", kickoff: kickoffET("2026-06-22", "17:00"), home: "🇮🇶 Iraq", away: "🇫🇷 France", officialOrderReversed: true },
-  { id: "m54", matchNumber: 41, stage: "group", group: "Gruppo I", date: "2026-06-22", kickoff: kickoffET("2026-06-22", "20:00"), home: "🇳🇴 Norway", away: "🇸🇳 Senegal" },
-  { id: "m55", matchNumber: 19, stage: "group", group: "Gruppo J", date: "2026-06-16", kickoff: kickoffET("2026-06-16", "21:00"), home: "🇦🇷 Argentina", away: "🇩🇿 Algeria" },
-  { id: "m56", matchNumber: 20, stage: "group", group: "Gruppo J", date: "2026-06-16", kickoff: kickoffET("2026-06-16", "00:00"), home: "🇦🇹 Austria", away: "🇯🇴 Jordan" },
-  { id: "m57", matchNumber: 43, stage: "group", group: "Gruppo J", date: "2026-06-22", kickoff: kickoffET("2026-06-22", "13:00"), home: "🇦🇷 Argentina", away: "🇦🇹 Austria" },
-  { id: "m58", matchNumber: 44, stage: "group", group: "Gruppo J", date: "2026-06-22", kickoff: kickoffET("2026-06-22", "23:00"), home: "🇯🇴 Jordan", away: "🇩🇿 Algeria" },
-  { id: "m59", matchNumber: 70, stage: "group", group: "Gruppo J", date: "2026-06-27", kickoff: kickoffET("2026-06-27", "22:00"), home: "🇯🇴 Jordan", away: "🇦🇷 Argentina" },
-  { id: "m60", matchNumber: 69, stage: "group", group: "Gruppo J", date: "2026-06-27", kickoff: kickoffET("2026-06-27", "22:00"), home: "🇩🇿 Algeria", away: "🇦🇹 Austria" },
-  { id: "m61", matchNumber: 23, stage: "group", group: "Gruppo K", date: "2026-06-17", kickoff: kickoffET("2026-06-17", "13:00"), home: "🇵🇹 Portugal", away: "🇨🇩 DR Congo" },
-  { id: "m62", matchNumber: 24, stage: "group", group: "Gruppo K", date: "2026-06-17", kickoff: kickoffET("2026-06-17", "22:00"), home: "🇨🇴 Colombia", away: "🇺🇿 Uzbekistan", officialOrderReversed: true },
-  { id: "m63", matchNumber: 71, stage: "group", group: "Gruppo K", date: "2026-06-27", kickoff: kickoffET("2026-06-27", "19:30"), home: "🇵🇹 Portugal", away: "🇨🇴 Colombia", officialOrderReversed: true },
-  { id: "m64", matchNumber: 72, stage: "group", group: "Gruppo K", date: "2026-06-27", kickoff: kickoffET("2026-06-27", "19:30"), home: "🇺🇿 Uzbekistan", away: "🇨🇩 DR Congo", officialOrderReversed: true },
-  { id: "m65", matchNumber: 47, stage: "group", group: "Gruppo K", date: "2026-06-23", kickoff: kickoffET("2026-06-23", "13:00"), home: "🇺🇿 Uzbekistan", away: "🇵🇹 Portugal", officialOrderReversed: true },
-  { id: "m66", matchNumber: 48, stage: "group", group: "Gruppo K", date: "2026-06-23", kickoff: kickoffET("2026-06-23", "22:00"), home: "🇨🇩 DR Congo", away: "🇨🇴 Colombia", officialOrderReversed: true },
-  { id: "m67", matchNumber: 22, stage: "group", group: "Gruppo L", date: "2026-06-17", kickoff: kickoffET("2026-06-17", "16:00"), home: "🏴 England", away: "🇭🇷 Croatia" },
-  { id: "m68", matchNumber: 21, stage: "group", group: "Gruppo L", date: "2026-06-17", kickoff: kickoffET("2026-06-17", "19:00"), home: "🇬🇭 Ghana", away: "🇵🇦 Panama" },
-  { id: "m69", matchNumber: 45, stage: "group", group: "Gruppo L", date: "2026-06-23", kickoff: kickoffET("2026-06-23", "16:00"), home: "🏴 England", away: "🇬🇭 Ghana" },
-  { id: "m70", matchNumber: 46, stage: "group", group: "Gruppo L", date: "2026-06-23", kickoff: kickoffET("2026-06-23", "19:00"), home: "🇵🇦 Panama", away: "🇭🇷 Croatia" },
-  { id: "m71", matchNumber: 67, stage: "group", group: "Gruppo L", date: "2026-06-27", kickoff: kickoffET("2026-06-27", "17:00"), home: "🇵🇦 Panama", away: "🏴 England" },
-  { id: "m72", matchNumber: 68, stage: "group", group: "Gruppo L", date: "2026-06-27", kickoff: kickoffET("2026-06-27", "17:00"), home: "🇭🇷 Croatia", away: "🇬🇭 Ghana" },
-];
+export const matches = groups.flatMap((group, groupIndex) => {
+  const [t1, t2, t3, t4] = group.teams;
+  const base = groupIndex * 6;
+  const dayOffset = groupIndex;
+  const d1 = new Date(startDate); d1.setDate(startDate.getDate() + dayOffset);
+  const d2 = new Date(startDate); d2.setDate(startDate.getDate() + dayOffset + 5);
+  const d3 = new Date(startDate); d3.setDate(startDate.getDate() + dayOffset + 10);
+  const iso = (d, h) => { const x = new Date(d); x.setHours(h,0,0,0); return x.toISOString(); };
+  return [
+    { id: `m${base + 1}`, group: group.name, date: "Da definire", kickoff: iso(d1, 18), home: t1, away: t2 },
+    { id: `m${base + 2}`, group: group.name, date: "Da definire", kickoff: iso(d1, 21), home: t3, away: t4 },
+    { id: `m${base + 3}`, group: group.name, date: "Da definire", kickoff: iso(d2, 18), home: t1, away: t3 },
+    { id: `m${base + 4}`, group: group.name, date: "Da definire", kickoff: iso(d2, 21), home: t4, away: t2 },
+    { id: `m${base + 5}`, group: group.name, date: "Da definire", kickoff: iso(d3, 18), home: t4, away: t1 },
+    { id: `m${base + 6}`, group: group.name, date: "Da definire", kickoff: iso(d3, 21), home: t2, away: t3 },
+  ];
+});
 
 export const knockoutRounds = [
-  { round: "Sedicesimi", matches: ["2A - 2B", "1E - 3ABCDF", "1F - 2C", "1C - 2F", "1I - 3CDFGH", "2E - 2I", "1A - 3CEFHI", "1L - 3EHIJK", "1D - 3BEFIJ", "1G - 3AEHIJ", "2K - 2L", "1H - 2J", "1B - 3EFGIJ", "1J - 2H", "1K - 3DEIJL", "2D - 2G"] },
-  { round: "Ottavi", matches: ["Vincente S2 - Vincente S5", "Vincente S1 - Vincente S3", "Vincente S4 - Vincente S6", "Vincente S7 - Vincente S8", "Vincente S11 - Vincente S12", "Vincente S9 - Vincente S10", "Vincente S14 - Vincente S16", "Vincente S13 - Vincente S15"] },
-  { round: "Quarti", matches: ["Vincente O1 - Vincente O2", "Vincente O5 - Vincente O6", "Vincente O3 - Vincente O4", "Vincente O7 - Vincente O8"] },
+  { round: "Sedicesimi", matches: ["1A - Migliore 3ª", "1B - Migliore 3ª", "1C - Migliore 3ª", "1D - Migliore 3ª", "1E - 2F", "1F - 2E", "1G - 2H", "1H - 2G", "1I - 2J", "1J - 2I", "1K - 2L", "1L - 2K", "2A - 2B", "2C - 2D", "2E - 2F", "2G - 2H"] },
+  { round: "Ottavi", matches: ["Vincente S1 - Vincente S2", "Vincente S3 - Vincente S4", "Vincente S5 - Vincente S6", "Vincente S7 - Vincente S8", "Vincente S9 - Vincente S10", "Vincente S11 - Vincente S12", "Vincente S13 - Vincente S14", "Vincente S15 - Vincente S16"] },
+  { round: "Quarti", matches: ["Vincente O1 - Vincente O2", "Vincente O3 - Vincente O4", "Vincente O5 - Vincente O6", "Vincente O7 - Vincente O8"] },
   { round: "Semifinali", matches: ["Vincente Q1 - Vincente Q2", "Vincente Q3 - Vincente Q4"] },
   { round: "Finale 3° posto", matches: ["Perdente SF1 - Perdente SF2"] },
   { round: "Finale", matches: ["Vincente SF1 - Vincente SF2"] },
 ];
-
 
 export const topScorers = [
   "🇲🇽 Santiago Giménez (Mexico)",

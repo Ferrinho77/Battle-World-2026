@@ -110,6 +110,8 @@ function App() {
   const [knockoutOverrides, setKnockoutOverrides] = useState({});
   const [predictionLockModeControl, setPredictionLockModeControl] = useState("AUTO");
   const [predictionLockControlLoading, setPredictionLockControlLoading] = useState(false);
+  const normalizePredictionLockMode = (mode) => String(mode || "AUTO").trim().toUpperCase();
+  const effectivePredictionLockMode = normalizePredictionLockMode(predictionLockModeControl);
   const [matchEvents, setMatchEvents] = useState({});
   const [selectedTopScorer, setSelectedTopScorer] = useState("");
   const [finalTopScorer, setFinalTopScorer] = useState("");
@@ -482,22 +484,19 @@ function getPredictionLockText(match) {
     return `{t.editableUntilMatchKickoff} ${label}`;
   }
 
-  function isPredictionLockedWithControl(match, controlMode = predictionLockModeControl) {
-    if (controlMode === "FORCE_LOCKED") return true;
-    if (controlMode === "FORCE_UNLOCKED") return false;
+  function isPredictionLocked(match) {
+    const mode = effectivePredictionLockMode;
+    if (mode === "FORCE_LOCKED") return true;
+    if (mode === "FORCE_UNLOCKED") return false;
 
     const lockDate = getPredictionLockDate(match);
     if (!lockDate) return false;
 
-    const comparisonDate = controlMode === "TEST_STARTED"
+    const comparisonDate = mode === "TEST_STARTED"
       ? new Date((getTournamentStartDate()?.getTime?.() || Date.now()) + 60 * 1000)
       : new Date();
 
     return comparisonDate >= new Date(lockDate);
-  }
-
-  function isPredictionLocked(match) {
-    return isPredictionLockedWithControl(match, predictionLockModeControl);
   }
 
   function getCurrentKnockoutRoundForValidation(matchList = []) {
@@ -548,8 +547,9 @@ function getPredictionLockText(match) {
   }
 
   function isTournamentStarted() {
-    if (predictionLockModeControl === "FORCE_LOCKED" || predictionLockModeControl === "TEST_STARTED") return true;
-    if (predictionLockModeControl === "FORCE_UNLOCKED") return false;
+    const mode = effectivePredictionLockMode;
+    if (mode === "FORCE_LOCKED" || mode === "TEST_STARTED") return true;
+    if (mode === "FORCE_UNLOCKED") return false;
     const start = getTournamentStartDate();
     return !!start && new Date() >= start;
   }
@@ -1189,36 +1189,35 @@ function getPlayersInLeague() {
     }
   }
 
-  async function fetchPredictionLockControlMode(leagueId) {
-    if (!leagueId) return "AUTO";
+  async function loadPredictionLockControl(leagueId) {
+    if (!leagueId) return;
     const { data, error } = await supabase
       .from("prediction_lock_control")
       .select("lock_mode")
       .eq("league_id", leagueId)
       .maybeSingle();
 
-    if (!error && data?.lock_mode) return data.lock_mode;
-    return "AUTO";
-  }
+    if (!error && data?.lock_mode) {
+      setPredictionLockModeControl(normalizePredictionLockMode(data.lock_mode));
+      return;
+    }
 
-  async function loadPredictionLockControl(leagueId) {
-    if (!leagueId) return;
-    const mode = await fetchPredictionLockControlMode(leagueId);
-    setPredictionLockModeControl(mode);
-  }
-
-  async function refreshPredictionLockControl(leagueId = selectedLeague?.id) {
-    const mode = await fetchPredictionLockControlMode(leagueId);
-    setPredictionLockModeControl(mode);
-    return mode;
+    await supabase.from("prediction_lock_control").upsert({
+      league_id: leagueId,
+      lock_mode: "AUTO",
+      updated_by: user?.id || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "league_id" });
+    setPredictionLockModeControl("AUTO");
   }
 
   async function updatePredictionLockControl(mode) {
     if (!selectedLeague?.id) return;
+    const nextMode = normalizePredictionLockMode(mode);
     setPredictionLockControlLoading(true);
     const { error } = await supabase.from("prediction_lock_control").upsert({
       league_id: selectedLeague.id,
-      lock_mode: mode,
+      lock_mode: nextMode,
       updated_by: user?.id || null,
       updated_at: new Date().toISOString(),
     }, { onConflict: "league_id" });
@@ -1229,8 +1228,8 @@ function getPlayersInLeague() {
       return;
     }
 
-    setPredictionLockModeControl(mode);
-    setMessage(`Blocco pronostici: ${mode} ✅`);
+    setPredictionLockModeControl(nextMode);
+    setMessage(`Blocco pronostici: ${nextMode} ✅`);
   }
 
   function validateLeagueSettings() {
@@ -2050,12 +2049,6 @@ ${targetEmail}`);
   }
 
   function updatePrediction(matchId, field, value) {
-    const match = [...matches, ...knockoutMatches].find((item) => item.id === matchId);
-    if (match && isPredictionLocked(match)) {
-      setMessage(`${t.predictionLocked} 🔒`);
-      return;
-    }
-
     setPredictions({ ...predictions, [matchId]: { ...predictions[matchId], [field]: normalizeScoreInput(value) } });
     setMissingPredictionFields((prev) => {
       const next = { ...prev };
@@ -2222,16 +2215,10 @@ ${targetEmail}`);
   }
 
   async function saveAllPredictions(matchList = matches) {
-    const freshLockMode = await refreshPredictionLockControl();
-    if (freshLockMode === "FORCE_LOCKED") {
-      setMessage(`${t.predictionsClosed || t.predictionLocked || "Pronostici chiusi"} 🔒`);
-      return;
-    }
-
     if (!validateMatchPredictions(matchList)) return;
     const rows = matchList.filter((match) => {
       const p = predictions[match.id];
-      return p && p.home_score !== undefined && p.home_score !== "" && p.away_score !== undefined && p.away_score !== "" && !isPredictionLockedWithControl(match, freshLockMode);
+      return p && p.home_score !== undefined && p.home_score !== "" && p.away_score !== undefined && p.away_score !== "" && !isPredictionLocked(match);
     }).map((match) => {
       const p = predictions[match.id];
       return { user_id: user.id, username: username || user.email.split("@")[0], user_email: user.email, league_id: selectedLeague.id, match_id: match.id, home_score: Number(p.home_score), away_score: Number(p.away_score), points: 0 };
@@ -2244,8 +2231,6 @@ ${targetEmail}`);
 
 
   async function saveBonusPredictions() {
-    const freshLockMode = await refreshPredictionLockControl();
-    if (freshLockMode === "FORCE_LOCKED") { setMessage(`${t.predictionsClosed || t.predictionLocked || "Pronostici chiusi"} 🔒`); return; }
     if (isTournamentStarted()) { setMessage(`${t.predictionsLockedTournamentStarted} 🔒`); return; }
     if (!selectedLeague?.id || selectedLeague?.__global || !user?.id) return;
     if ((activeTab === "passaggio-turno" || activeTab === "piazzamento-gironi") && !validateBonusPredictions()) return;
@@ -2278,8 +2263,6 @@ ${targetEmail}`);
   }
 
   async function saveTopScorerPrediction() {
-    const freshLockMode = await refreshPredictionLockControl();
-    if (freshLockMode === "FORCE_LOCKED") { setMessage(`${t.topScorerPredictionLocked || t.predictionLocked} 🔒`); return; }
     if (isTournamentStarted()) { setMessage(t.topScorerPredictionLocked); return; }
     if (!selectedTopScorer) { setMessage(t.selectPlayerMessage); return; }
     if (!selectedLeague?.id || selectedLeague?.__global || !user?.id) { setMessage(t.selectPlayerMessage); return; }
@@ -3486,7 +3469,7 @@ ${targetEmail}`);
             knockoutOverrides={knockoutOverrides}
             saveKnockoutOverride={saveKnockoutOverride}
             clearKnockoutOverride={clearKnockoutOverride}
-            predictionLockModeControl={predictionLockModeControl}
+            predictionLockModeControl={effectivePredictionLockMode}
             predictionLockControlLoading={predictionLockControlLoading}
             updatePredictionLockControl={updatePredictionLockControl}
             userAdminContent={
