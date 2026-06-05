@@ -79,8 +79,6 @@ function App() {
     bonus_champion_points: 15,
     bonus_group_exact_points: 3,
   });
-  const [predictionLockControl, setPredictionLockControl] = useState({ lock_mode: "AUTO" });
-  const [predictionLockSaving, setPredictionLockSaving] = useState(false);
   const [globalAdminEmails, setGlobalAdminEmails] = useState([]);
   const [newGlobalAdminEmail, setNewGlobalAdminEmail] = useState("");
   const [globalAdminsLoading, setGlobalAdminsLoading] = useState(false);
@@ -109,6 +107,9 @@ function App() {
   const [allBonusPredictions, setAllBonusPredictions] = useState([]);
   const [allPredictions, setAllPredictions] = useState([]);
   const [realResults, setRealResults] = useState({});
+  const [knockoutOverrides, setKnockoutOverrides] = useState({});
+  const [predictionLockModeControl, setPredictionLockModeControl] = useState("AUTO");
+  const [predictionLockControlLoading, setPredictionLockControlLoading] = useState(false);
   const [matchEvents, setMatchEvents] = useState({});
   const [selectedTopScorer, setSelectedTopScorer] = useState("");
   const [finalTopScorer, setFinalTopScorer] = useState("");
@@ -388,6 +389,14 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (selectedLeague?.id) {
+      loadPredictionLockControl(selectedLeague.id);
+    } else {
+      setPredictionLockModeControl("AUTO");
+    }
+  }, [selectedLeague?.id]);
+
+  useEffect(() => {
     if (user && activeTab === "admin" && isControlRoomOwner) {
       loadGlobalDashboardStats();
       loadGlobalUsers();
@@ -427,80 +436,6 @@ function App() {
       setPlayers([]);
     }
     setPlayersLoading(false);
-  }
-
-  function getManualLockMode() {
-    return predictionLockControl?.lock_mode || "AUTO";
-  }
-
-  function getEffectiveNow() {
-    const mode = getManualLockMode();
-    if (mode === "TEST_STARTED") {
-      const start = getTournamentStartDate();
-      if (start) return new Date(new Date(start).getTime() + 60 * 1000);
-    }
-    return new Date();
-  }
-
-  function getPredictionLockModeLabel(mode = getManualLockMode()) {
-    const labels = {
-      AUTO: "Automatico calendario",
-      FORCE_LOCKED: "Forzato bloccato",
-      FORCE_UNLOCKED: "Forzato sbloccato",
-      TEST_STARTED: "Test: torneo iniziato",
-    };
-    return labels[mode] || labels.AUTO;
-  }
-
-  async function loadPredictionLockControl(leagueId) {
-    if (!leagueId) {
-      setPredictionLockControl({ lock_mode: "AUTO" });
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("prediction_lock_control")
-      .select("lock_mode")
-      .eq("league_id", leagueId)
-      .maybeSingle();
-
-    if (error) {
-      console.warn("prediction_lock_control not available:", error.message);
-      setPredictionLockControl({ lock_mode: "AUTO" });
-      return;
-    }
-
-    setPredictionLockControl({ lock_mode: data?.lock_mode || "AUTO" });
-  }
-
-  async function savePredictionLockMode(mode) {
-    setPredictionLockControl({ lock_mode: mode });
-
-    if (!selectedLeague?.id || selectedLeague?.__global) {
-      setMessage(`Blocco pronostici: ${getPredictionLockModeLabel(mode)} ✅`);
-      return;
-    }
-
-    setPredictionLockSaving(true);
-    const { error } = await supabase
-      .from("prediction_lock_control")
-      .upsert(
-        {
-          league_id: selectedLeague.id,
-          lock_mode: mode,
-          updated_at: new Date().toISOString(),
-          updated_by: user?.id || null,
-        },
-        { onConflict: "league_id" }
-      );
-    setPredictionLockSaving(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setMessage(`Blocco pronostici: ${getPredictionLockModeLabel(mode)} ✅`);
   }
 
   function getRoundStartDate(roundName) {
@@ -547,14 +482,22 @@ function getPredictionLockText(match) {
     return `{t.editableUntilMatchKickoff} ${label}`;
   }
 
-  function isPredictionLocked(match) {
-    const mode = getManualLockMode();
-    if (mode === "FORCE_LOCKED") return true;
-    if (mode === "FORCE_UNLOCKED") return false;
+  function isPredictionLockedWithControl(match, controlMode = predictionLockModeControl) {
+    if (controlMode === "FORCE_LOCKED") return true;
+    if (controlMode === "FORCE_UNLOCKED") return false;
 
     const lockDate = getPredictionLockDate(match);
     if (!lockDate) return false;
-    return getEffectiveNow() >= new Date(lockDate);
+
+    const comparisonDate = controlMode === "TEST_STARTED"
+      ? new Date((getTournamentStartDate()?.getTime?.() || Date.now()) + 60 * 1000)
+      : new Date();
+
+    return comparisonDate >= new Date(lockDate);
+  }
+
+  function isPredictionLocked(match) {
+    return isPredictionLockedWithControl(match, predictionLockModeControl);
   }
 
   function getCurrentKnockoutRoundForValidation(matchList = []) {
@@ -605,12 +548,10 @@ function getPredictionLockText(match) {
   }
 
   function isTournamentStarted() {
-    const mode = getManualLockMode();
-    if (mode === "FORCE_LOCKED" || mode === "TEST_STARTED") return true;
-    if (mode === "FORCE_UNLOCKED") return false;
-
+    if (predictionLockModeControl === "FORCE_LOCKED" || predictionLockModeControl === "TEST_STARTED") return true;
+    if (predictionLockModeControl === "FORCE_UNLOCKED") return false;
     const start = getTournamentStartDate();
-    return !!start && getEffectiveNow() >= start;
+    return !!start && new Date() >= start;
   }
 
   function formatTournamentStart() {
@@ -779,14 +720,24 @@ function getPlayersInLeague() {
     return getGroupStandings(groupName)[position]?.team || clean;
   }
 
+  function getGroupLetter(groupName) {
+    const match = String(groupName || "").match(/([A-L])$/i);
+    return match ? match[1].toUpperCase() : "";
+  }
+
   function getBestThirdTeams() {
     const thirds = [];
     groups.forEach((group) => {
       if (getFinishedCountForGroup(group.name) < 6) return;
       const third = getGroupStandings(group.name)[2];
-      if (third) thirds.push(third);
+      if (third) thirds.push({ ...third, groupLetter: getGroupLetter(group.name) });
     });
-    return thirds.sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf);
+    return thirds.sort((a, b) =>
+      b.points - a.points ||
+      b.gd - a.gd ||
+      b.gf - a.gf ||
+      String(a.team || "").localeCompare(String(b.team || ""))
+    );
   }
 
   function getKnockoutKickoff(round, index) {
@@ -813,16 +764,32 @@ function getPlayersInLeague() {
       "Finale 3° posto": "F3",
       Finale: "F",
     };
-    let thirdIndex = 0;
     const bestThirds = getBestThirdTeams();
+    const usedThirdGroups = new Set();
     const codeMap = {};
+
+    const resolveBestThirdToken = (clean) => {
+      const match = clean.match(/^3([A-L]+)$/i);
+      if (!match) return null;
+      const allowedGroups = match[1].toUpperCase().split("");
+      const candidate = bestThirds.find((third) =>
+        allowedGroups.includes(third.groupLetter) && !usedThirdGroups.has(third.groupLetter)
+      );
+      if (!candidate) return clean;
+      usedThirdGroups.add(candidate.groupLetter);
+      return candidate.team;
+    };
 
     const resolveToken = (token) => {
       const clean = String(token).trim();
+      const bestThirdToken = resolveBestThirdToken(clean);
+      if (bestThirdToken) return bestThirdToken;
+
       if (clean.includes("Migliore 3ª")) {
-        const team = bestThirds[thirdIndex]?.team || `Migliore 3ª ${thirdIndex + 1}`;
-        thirdIndex += 1;
-        return team;
+        const candidate = bestThirds.find((third) => !usedThirdGroups.has(third.groupLetter));
+        if (!candidate) return clean;
+        usedThirdGroups.add(candidate.groupLetter);
+        return candidate.team;
       }
 
       const winner = clean.match(/^Vincente\s+(.+)$/i);
@@ -831,6 +798,7 @@ function getPlayersInLeague() {
         if (!source) return clean;
         const result = realResults[source.id];
         if (!result?.finished) return clean;
+        if (result.qualified_team) return result.qualified_team;
         if (Number(result.home_score) === Number(result.away_score)) return clean;
         return Number(result.home_score) > Number(result.away_score) ? source.home : source.away;
       }
@@ -841,6 +809,10 @@ function getPlayersInLeague() {
         if (!source) return clean;
         const result = realResults[source.id];
         if (!result?.finished) return clean;
+        if (result.qualified_team) {
+          if (result.qualified_team === source.home) return source.away;
+          if (result.qualified_team === source.away) return source.home;
+        }
         if (Number(result.home_score) === Number(result.away_score)) return clean;
         return Number(result.home_score) > Number(result.away_score) ? source.away : source.home;
       }
@@ -854,8 +826,12 @@ function getPlayersInLeague() {
       round.matches.forEach((label, index) => {
         const [homeRaw, awayRaw] = label.split(" - ").map((x) => x.trim());
         const code = prefix === "F" ? "F" : prefix === "F3" ? "F3" : `${prefix}${index + 1}`;
+        const id = `ko-${code.toLowerCase()}`;
+        const override = knockoutOverrides[id];
+        const autoHome = resolveToken(homeRaw);
+        const autoAway = resolveToken(awayRaw);
         const item = {
-          id: `ko-${code.toLowerCase()}`,
+          id,
           code,
           round: round.round,
           group: round.round,
@@ -863,8 +839,11 @@ function getPlayersInLeague() {
           kickoff: getKnockoutKickoff(round.round, index),
           homeRaw,
           awayRaw,
-          home: resolveToken(homeRaw),
-          away: resolveToken(awayRaw),
+          autoHome,
+          autoAway,
+          home: override?.home_team || autoHome,
+          away: override?.away_team || autoAway,
+          manualOverride: !!override,
         };
         codeMap[code] = item;
         list.push(item);
@@ -877,14 +856,21 @@ function getPlayersInLeague() {
   function getWinnerFromMatch(matchId) {
     const ko = buildKnockoutMatches().find((m) => m.id === matchId);
     const result = realResults[matchId];
-    if (!ko || !result?.finished || Number(result.home_score) === Number(result.away_score)) return "";
+    if (!ko || !result?.finished) return "";
+    if (result.qualified_team) return result.qualified_team;
+    if (Number(result.home_score) === Number(result.away_score)) return "";
     return Number(result.home_score) > Number(result.away_score) ? ko.home : ko.away;
   }
 
   function getLoserFromMatch(matchId) {
     const ko = buildKnockoutMatches().find((m) => m.id === matchId);
     const result = realResults[matchId];
-    if (!ko || !result?.finished || Number(result.home_score) === Number(result.away_score)) return "";
+    if (!ko || !result?.finished) return "";
+    if (result.qualified_team) {
+      if (result.qualified_team === ko.home) return ko.away;
+      if (result.qualified_team === ko.away) return ko.home;
+    }
+    if (Number(result.home_score) === Number(result.away_score)) return "";
     return Number(result.home_score) > Number(result.away_score) ? ko.away : ko.home;
   }
 
@@ -920,10 +906,6 @@ function getPlayersInLeague() {
   }
 
   function setBonusValue(type, key, value) {
-    if (isTournamentStarted()) {
-      setMessage(`${t.predictionsLockedTournamentStarted} 🔒`);
-      return;
-    }
     setBonusPredictions({ ...bonusPredictions, [`${type}::${key}`]: value });
   }
 
@@ -1204,8 +1186,51 @@ function getPlayersInLeague() {
         bonus_group_exact_points: data.bonus_group_exact_points ?? 3,
       });
       setIsAdmin(data.owner_id === user.id);
-      await loadPredictionLockControl(leagueId);
     }
+  }
+
+  async function fetchPredictionLockControlMode(leagueId) {
+    if (!leagueId) return "AUTO";
+    const { data, error } = await supabase
+      .from("prediction_lock_control")
+      .select("lock_mode")
+      .eq("league_id", leagueId)
+      .maybeSingle();
+
+    if (!error && data?.lock_mode) return data.lock_mode;
+    return "AUTO";
+  }
+
+  async function loadPredictionLockControl(leagueId) {
+    if (!leagueId) return;
+    const mode = await fetchPredictionLockControlMode(leagueId);
+    setPredictionLockModeControl(mode);
+  }
+
+  async function refreshPredictionLockControl(leagueId = selectedLeague?.id) {
+    const mode = await fetchPredictionLockControlMode(leagueId);
+    setPredictionLockModeControl(mode);
+    return mode;
+  }
+
+  async function updatePredictionLockControl(mode) {
+    if (!selectedLeague?.id) return;
+    setPredictionLockControlLoading(true);
+    const { error } = await supabase.from("prediction_lock_control").upsert({
+      league_id: selectedLeague.id,
+      lock_mode: mode,
+      updated_by: user?.id || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "league_id" });
+    setPredictionLockControlLoading(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setPredictionLockModeControl(mode);
+    setMessage(`Blocco pronostici: ${mode} ✅`);
   }
 
   function validateLeagueSettings() {
@@ -1796,7 +1821,67 @@ ${targetEmail}`);
     setMatchEvents(formatted);
   }
 
-  async function saveRealResult(matchId, home, away, finished = true) {
+  async function loadKnockoutOverrides(leagueId = selectedLeague?.id) {
+    if (!leagueId || leagueId === "GLOBAL_CONTROL_ROOM") {
+      setKnockoutOverrides({});
+      return;
+    }
+    const { data, error } = await supabase
+      .from("knockout_overrides")
+      .select("match_id, home_team, away_team")
+      .eq("league_id", leagueId);
+    if (error) {
+      console.warn("knockout_overrides not available:", error.message);
+      setKnockoutOverrides({});
+      return;
+    }
+    const formatted = {};
+    (data || []).forEach((row) => {
+      formatted[row.match_id] = { home_team: row.home_team, away_team: row.away_team };
+    });
+    setKnockoutOverrides(formatted);
+  }
+
+  async function saveKnockoutOverride(matchId, homeTeam, awayTeam) {
+    if (!selectedLeague?.id || selectedLeague?.__global) return;
+    if (!homeTeam || !awayTeam) {
+      setMessage("Seleziona entrambe le squadre del tabellone.");
+      return;
+    }
+    const { error } = await supabase.from("knockout_overrides").upsert(
+      {
+        league_id: selectedLeague.id,
+        match_id: matchId,
+        home_team: homeTeam,
+        away_team: awayTeam,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "league_id,match_id" }
+    );
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    await loadKnockoutOverrides(selectedLeague.id);
+    setMessage("Tabellone aggiornato manualmente ✅");
+  }
+
+  async function clearKnockoutOverride(matchId) {
+    if (!selectedLeague?.id || selectedLeague?.__global) return;
+    const { error } = await supabase
+      .from("knockout_overrides")
+      .delete()
+      .eq("league_id", selectedLeague.id)
+      .eq("match_id", matchId);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    await loadKnockoutOverrides(selectedLeague.id);
+    setMessage("Slot ripristinato automatico ✅");
+  }
+
+  async function saveRealResult(matchId, home, away, finished = true, qualifiedTeam = null, winType = null) {
     if (home === "" || away === "") { setMessage(t.enterRealResult); return; }
     const homeScore = Number(home);
     const awayScore = Number(away);
@@ -1805,7 +1890,7 @@ ${targetEmail}`);
       return;
     }
     const { error } = await supabase.from("real_results").upsert(
-      { match_id: matchId, home_score: homeScore, away_score: awayScore, finished },
+      { match_id: matchId, home_score: homeScore, away_score: awayScore, finished, qualified_team: qualifiedTeam || null, win_type: winType || null },
       { onConflict: "match_id" }
     );
     if (error) { setMessage(error.message); return; }
@@ -1827,6 +1912,7 @@ ${targetEmail}`);
       await loadAllBonusPredictions(selectedLeague.id);
       await loadAllTopScorerPredictions(selectedLeague.id);
       await loadLeagueSettings(selectedLeague.id);
+      await loadKnockoutOverrides(selectedLeague.id);
     }
     setMessage("Classifica ricalcolata ✅");
   }
@@ -1947,7 +2033,9 @@ ${targetEmail}`);
     loadLeagueParticipants(league.id);
     loadAllTopScorerPredictions(league.id);
     loadAllBonusPredictions(league.id);
+    loadKnockoutOverrides(league.id);
     loadLeagueSettings(league.id);
+    loadPredictionLockControl(league.id);
     if (user?.id) {
       loadPredictions(user.id, league.id);
       loadTopScorerPrediction(user.id, league.id);
@@ -1962,9 +2050,9 @@ ${targetEmail}`);
   }
 
   function updatePrediction(matchId, field, value) {
-    const match = [...matches, ...buildKnockoutMatches()].find((item) => item.id === matchId);
+    const match = [...matches, ...knockoutMatches].find((item) => item.id === matchId);
     if (match && isPredictionLocked(match)) {
-      setMessage(`${t.predictionsLockedTournamentStarted || t.predictionsClosed || "Pronostici chiusi"} 🔒`);
+      setMessage(`${t.predictionLocked} 🔒`);
       return;
     }
 
@@ -2134,10 +2222,16 @@ ${targetEmail}`);
   }
 
   async function saveAllPredictions(matchList = matches) {
+    const freshLockMode = await refreshPredictionLockControl();
+    if (freshLockMode === "FORCE_LOCKED") {
+      setMessage(`${t.predictionsClosed || t.predictionLocked || "Pronostici chiusi"} 🔒`);
+      return;
+    }
+
     if (!validateMatchPredictions(matchList)) return;
     const rows = matchList.filter((match) => {
       const p = predictions[match.id];
-      return p && p.home_score !== undefined && p.home_score !== "" && p.away_score !== undefined && p.away_score !== "" && !isPredictionLocked(match);
+      return p && p.home_score !== undefined && p.home_score !== "" && p.away_score !== undefined && p.away_score !== "" && !isPredictionLockedWithControl(match, freshLockMode);
     }).map((match) => {
       const p = predictions[match.id];
       return { user_id: user.id, username: username || user.email.split("@")[0], user_email: user.email, league_id: selectedLeague.id, match_id: match.id, home_score: Number(p.home_score), away_score: Number(p.away_score), points: 0 };
@@ -2150,6 +2244,8 @@ ${targetEmail}`);
 
 
   async function saveBonusPredictions() {
+    const freshLockMode = await refreshPredictionLockControl();
+    if (freshLockMode === "FORCE_LOCKED") { setMessage(`${t.predictionsClosed || t.predictionLocked || "Pronostici chiusi"} 🔒`); return; }
     if (isTournamentStarted()) { setMessage(`${t.predictionsLockedTournamentStarted} 🔒`); return; }
     if (!selectedLeague?.id || selectedLeague?.__global || !user?.id) return;
     if ((activeTab === "passaggio-turno" || activeTab === "piazzamento-gironi") && !validateBonusPredictions()) return;
@@ -2182,6 +2278,8 @@ ${targetEmail}`);
   }
 
   async function saveTopScorerPrediction() {
+    const freshLockMode = await refreshPredictionLockControl();
+    if (freshLockMode === "FORCE_LOCKED") { setMessage(`${t.topScorerPredictionLocked || t.predictionLocked} 🔒`); return; }
     if (isTournamentStarted()) { setMessage(t.topScorerPredictionLocked); return; }
     if (!selectedTopScorer) { setMessage(t.selectPlayerMessage); return; }
     if (!selectedLeague?.id || selectedLeague?.__global || !user?.id) { setMessage(t.selectPlayerMessage); return; }
@@ -3358,7 +3456,41 @@ ${targetEmail}`);
                 .global-cr-mobile-fix .global-users-table td:last-child > div { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
               }
             `}</style>
-            {isControlRoomOwner ? (
+
+
+            <AdminPanel
+            t={t}
+            users={users}
+            allDisplayMatches={allDisplayMatches}
+            realResults={realResults}
+            adminMatchFilter={adminMatchFilter}
+            setAdminMatchFilter={setAdminMatchFilter}
+            syncLiveResults={syncLiveResults}
+            recalculateLeagueData={recalculateLeagueData}
+            formatMatchDateTime={formatMatchDateTime}
+            trTeamLabel={trTeamLabel}
+            renderRealResult={renderRealResult}
+            saveRealResult={saveRealResult}
+            selectableTopScorers={selectableTopScorers}
+            topScorerGoalsPlayer={topScorerGoalsPlayer}
+            setTopScorerGoalsPlayer={setTopScorerGoalsPlayer}
+            topScorerGoals={topScorerGoals}
+            setTopScorerGoals={setTopScorerGoals}
+            saveTopScorerGoals={saveTopScorerGoals}
+            confirmedTopScorer={confirmedTopScorer}
+            finalTopScorer={finalTopScorer}
+            setFinalTopScorer={setFinalTopScorer}
+            saveFinalTopScorer={saveFinalTopScorer}
+            allTeams={allTeams}
+            knockoutMatches={knockoutMatches}
+            knockoutOverrides={knockoutOverrides}
+            saveKnockoutOverride={saveKnockoutOverride}
+            clearKnockoutOverride={clearKnockoutOverride}
+            predictionLockModeControl={predictionLockModeControl}
+            predictionLockControlLoading={predictionLockControlLoading}
+            updatePredictionLockControl={updatePredictionLockControl}
+            userAdminContent={
+isControlRoomOwner ? (
               <>
             <div className="league-box owner-only-control-room-box">
               <h2>📊 Global Control Room Dashboard</h2>
@@ -3559,44 +3691,8 @@ ${targetEmail}`);
                   Non puoi vedere utenti, email, leghe o autorizzare altri admin.
                 </p>
               </div>
-            )}
-
-            <div className="league-box">
-              <h3>🔐 Controllo manuale blocco pronostici</h3>
-              <p className="bonus-help">
-                Modalità attuale: <strong>{getPredictionLockModeLabel()}</strong>. Usa questi pulsanti solo per test o emergenza se il blocco automatico calendario non funziona.
-              </p>
-              <div className="admin-actions-row" style={{ flexWrap: "wrap" }}>
-                <button className="btn blue" disabled={predictionLockSaving} onClick={() => savePredictionLockMode("AUTO")}>✅ Automatico calendario</button>
-                <button className="btn danger" disabled={predictionLockSaving} onClick={() => savePredictionLockMode("FORCE_LOCKED")}>🔒 Blocca tutto</button>
-                <button className="btn green" disabled={predictionLockSaving} onClick={() => savePredictionLockMode("FORCE_UNLOCKED")}>🔓 Sblocca tutto</button>
-                <button className="btn blue" disabled={predictionLockSaving} onClick={() => savePredictionLockMode("TEST_STARTED")}>🧪 Simula torneo iniziato</button>
-              </div>
-            </div>
-
-            <AdminPanel
-            t={t}
-            users={users}
-            allDisplayMatches={allDisplayMatches}
-            realResults={realResults}
-            adminMatchFilter={adminMatchFilter}
-            setAdminMatchFilter={setAdminMatchFilter}
-            syncLiveResults={syncLiveResults}
-            recalculateLeagueData={recalculateLeagueData}
-            formatMatchDateTime={formatMatchDateTime}
-            trTeamLabel={trTeamLabel}
-            renderRealResult={renderRealResult}
-            saveRealResult={saveRealResult}
-            selectableTopScorers={selectableTopScorers}
-            topScorerGoalsPlayer={topScorerGoalsPlayer}
-            setTopScorerGoalsPlayer={setTopScorerGoalsPlayer}
-            topScorerGoals={topScorerGoals}
-            setTopScorerGoals={setTopScorerGoals}
-            saveTopScorerGoals={saveTopScorerGoals}
-            confirmedTopScorer={confirmedTopScorer}
-            finalTopScorer={finalTopScorer}
-            setFinalTopScorer={setFinalTopScorer}
-            saveFinalTopScorer={saveFinalTopScorer}
+            )
+            }
           />
           </div>
         )}
