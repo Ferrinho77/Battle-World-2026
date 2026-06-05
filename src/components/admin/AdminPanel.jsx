@@ -81,7 +81,7 @@ export default function AdminPanel({
     const winType = getKnockoutWinType(match);
 
     if (finished && !qualifiedTeam) {
-      alert("Seleziona la squadra qualificata prima di confermare il risultato finale.");
+      alert(t.selectQualifiedTeamBeforeConfirm || "Seleziona la squadra qualificata prima di confermare il risultato finale.");
       return;
     }
 
@@ -126,12 +126,12 @@ export default function AdminPanel({
   }, {});
 
   const adminTabs = [
-    { id: "dashboard", label: "📊 Dashboard" },
-    { id: "results", label: "⚽ Risultati" },
-    { id: "qualifications", label: "🏆 Qualificazioni" },
-    { id: "predictions", label: "🎯 Pronostici" },
-    { id: "users", label: "👥 Utenti / Admin" },
-    { id: "system", label: "⚙️ Sistema" },
+    { id: "dashboard", label: `📊 ${t.dashboard || "Dashboard"}` },
+    { id: "results", label: `⚽ ${t.results || "Risultati"}` },
+    { id: "qualifications", label: `🏆 ${t.qualifications || "Qualificazioni"}` },
+    { id: "predictions", label: `🎯 ${t.predictions || "Pronostici"}` },
+    { id: "users", label: `👥 ${t.userAdmin || "Utenti / Admin"}` },
+    { id: "system", label: `⚙️ ${t.system || "Sistema"}` },
   ];
 
   const teamOptions = Array.from(new Set([...(allTeams || []), ...(knockoutMatches || []).flatMap((m) => [m.home, m.away, m.autoHome, m.autoAway])].filter(Boolean)));
@@ -153,10 +153,10 @@ export default function AdminPanel({
           <div className="admin-dashboard-grid">
             <div className="admin-stat-card"><span>🔴 LIVE</span><strong>{allDisplayMatches.filter((match) => realResults[match.id] && !realResults[match.id]?.finished).length}</strong></div>
             <div className="admin-stat-card"><span>✅ FINAL</span><strong>{allDisplayMatches.filter((match) => realResults[match.id]?.finished).length}</strong></div>
-            <div className="admin-stat-card"><span>🟡 DA INSERIRE</span><strong>{allDisplayMatches.filter((match) => !realResults[match.id]).length}</strong></div>
-            <div className="admin-stat-card"><span>🏆 UTENTI</span><strong>{users.length}</strong></div>
+            <div className="admin-stat-card"><span>🟡 {t.toEnterUpper || "DA INSERIRE"}</span><strong>{allDisplayMatches.filter((match) => !realResults[match.id]).length}</strong></div>
+            <div className="admin-stat-card"><span>🏆 {t.usersUpper || "UTENTI"}</span><strong>{users.length}</strong></div>
           </div>
-          <div className="league-box"><h3>📊 Dashboard Control Room</h3><p className="bonus-help">Usa le sottopagine per gestire risultati, qualificazioni e sistema.</p></div>
+          <div className="league-box"><h3>📊 {t.controlRoomDashboard || "Dashboard Control Room"}</h3><p className="bonus-help">{t.controlRoomDashboardHelp || "Usa le sottopagine per gestire risultati, qualificazioni e sistema."}</p></div>
         </>
       )}
 
@@ -176,7 +176,7 @@ export default function AdminPanel({
 
           <div className="admin-section-title">
             <h3>{t.insertRealResults}</h3>
-            <p className="bonus-help">Modalità locale: inserisci LIVE o FINAL manualmente.</p>
+            <p className="bonus-help">{t.manualResultsModeHelp || "Modalità locale: inserisci LIVE o FINAL manualmente."}</p>
           </div>
 
           {adminMatchSections.map(([sectionName, sectionMatches]) => (
@@ -187,14 +187,14 @@ export default function AdminPanel({
                   const result = realResults[match.id];
                   const isFinal = !!result?.finished;
                   const statusClass = isFinal ? "admin-final" : result ? "admin-live" : "admin-pending";
-                  const statusLabel = isFinal ? "✅ FINAL" : result ? "🔴 LIVE" : "🟡 PENDING";
+                  const statusLabel = isFinal ? `✅ ${t.finalStatus || "FINAL"}` : result ? `🔴 ${t.liveStatus || "LIVE"}` : `🟡 ${t.pendingStatus || "PENDING"}`;
 
                   return (
                     <div key={match.id} className={`match-box admin-match-card ${statusClass}`}>
                       <div className="admin-match-head"><span>{statusLabel}</span><small>📅 {formatMatchDateTime(match)}</small></div>
                       <strong>{trTeamLabel(match.home)} - {trTeamLabel(match.away)}</strong>
                       {renderRealResult(match.id)}
-                      {isKnockoutMatch(match) && <p className="bonus-help" style={{ marginTop: 8 }}>Risultato dopo i 90 minuti per i pronostici. La squadra qualificata serve per tabellone e bonus passaggio turno.</p>}
+                      {isKnockoutMatch(match) && <p className="bonus-help" style={{ marginTop: 8 }}>{t.knockoutResultAdminHelp || "Risultato dopo i 90 minuti per i pronostici. La squadra qualificata serve per tabellone e bonus passaggio turno."}</p>}
                       <div className="score-row">
                         <input id={`rh-${match.id}`} type="number" min="0" max="20" placeholder={isKnockoutMatch(match) ? `${t.home} 90'` : t.home} defaultValue={result?.home_score ?? ""} disabled={isFinal} />
                         <input id={`ra-${match.id}`} type="number" min="0" max="20" placeholder={isKnockoutMatch(match) ? `${t.away} 90'` : t.away} defaultValue={result?.away_score ?? ""} disabled={isFinal} />
@@ -202,14 +202,14 @@ export default function AdminPanel({
                       {isKnockoutMatch(match) && (
                         <div className="score-row">
                           <select id={`rq-${match.id}`} defaultValue={result?.qualified_team || ""} disabled={isFinal}>
-                            <option value="">Qualificata</option>
+                            <option value="">{t.qualifiedTeam || "Qualificata"}</option>
                             <option value={match.home}>{trTeamLabel(match.home)}</option>
                             <option value={match.away}>{trTeamLabel(match.away)}</option>
                           </select>
                           <select id={`rwt-${match.id}`} defaultValue={result?.win_type || "REGULAR"} disabled={isFinal}>
                             <option value="REGULAR">90'</option>
-                            <option value="EXTRA_TIME">DTS</option>
-                            <option value="PENALTIES">Rigori</option>
+                            <option value="EXTRA_TIME">{t.extraTimeShort || "DTS"}</option>
+                            <option value="PENALTIES">{t.penaltiesShort || "Rigori"}</option>
                           </select>
                         </div>
                       )}
@@ -232,8 +232,8 @@ export default function AdminPanel({
 
       {activeAdminTab === "qualifications" && (
         <div className="league-box">
-          <h3>🏆 Qualificazioni / Tabellone Admin</h3>
-          <p className="bonus-help">Qui puoi controllare il tabellone nello stesso ordine della fase finale. Le squadre vengono proposte automaticamente da classifica gironi, migliori terze e vincitori; se serve puoi correggere manualmente ogni slot.</p>
+          <h3>🏆 {t.qualificationsBracketAdmin || "Qualificazioni / Tabellone Admin"}</h3>
+          <p className="bonus-help">{t.qualificationsBracketAdminHelp || "Qui puoi controllare il tabellone nello stesso ordine della fase finale. Le squadre vengono proposte automaticamente da classifica gironi, migliori terze e vincitori; se serve puoi correggere manualmente ogni slot."}</p>
           {Object.entries(knockoutByRound).map(([roundName, roundMatches]) => (
             <div key={roundName} className="admin-round-section">
               <h3 className="admin-round-title">{roundName}</h3>
@@ -243,22 +243,22 @@ export default function AdminPanel({
                   return (
                     <div key={match.id} className="match-box admin-match-card">
                       <div className="admin-match-head"><span>{match.code}</span><small>{formatMatchDateTime(match)}</small></div>
-                      <p className="bonus-help">Formula: {match.homeRaw} vs {match.awayRaw}</p>
-                      <p className="bonus-help">Automatico: {trTeamLabel(match.autoHome)} vs {trTeamLabel(match.autoAway)}</p>
-                      {override && <p style={{ color: "#f5a524", fontWeight: "bold" }}>✏️ Override manuale attivo</p>}
+                      <p className="bonus-help">{t.formula || "Formula"}: {match.homeRaw} vs {match.awayRaw}</p>
+                      <p className="bonus-help">{t.automatic || "Automatico"}: {trTeamLabel(match.autoHome)} vs {trTeamLabel(match.autoAway)}</p>
+                      {override && <p style={{ color: "#f5a524", fontWeight: "bold" }}>✏️ {t.manualOverrideActive || "Override manuale attivo"}</p>}
                       <div className="score-row">
                         <select id={`ko-home-${match.id}`} defaultValue={match.home || ""}>
-                          <option value="">Squadra casa</option>
+                          <option value="">{t.homeTeam || "Squadra casa"}</option>
                           {teamOptions.map((team) => <option key={`${match.id}-h-${team}`} value={team}>{trTeamLabel(team)}</option>)}
                         </select>
                         <select id={`ko-away-${match.id}`} defaultValue={match.away || ""}>
-                          <option value="">Squadra trasferta</option>
+                          <option value="">{t.awayTeam || "Squadra trasferta"}</option>
                           {teamOptions.map((team) => <option key={`${match.id}-a-${team}`} value={team}>{trTeamLabel(team)}</option>)}
                         </select>
                       </div>
                       <div className="admin-actions-row">
-                        <button className="btn green" onClick={() => saveKnockoutOverride?.(match.id, getInputValue(`ko-home-${match.id}`), getInputValue(`ko-away-${match.id}`))}>💾 Salva modifica</button>
-                        <button className="btn blue" onClick={() => clearKnockoutOverride?.(match.id)}>↩️ Automatico</button>
+                        <button className="btn green" onClick={() => saveKnockoutOverride?.(match.id, getInputValue(`ko-home-${match.id}`), getInputValue(`ko-away-${match.id}`))}>💾 {t.saveChanges || "Salva modifica"}</button>
+                        <button className="btn blue" onClick={() => clearKnockoutOverride?.(match.id)}>↩️ {t.automatic || "Automatico"}</button>
                       </div>
                     </div>
                   );
@@ -271,26 +271,26 @@ export default function AdminPanel({
 
       {activeAdminTab === "predictions" && (
         <div className="league-box">
-          <h3>🎯 Blocco manuale pronostici</h3>
+          <h3>🎯 {t.predictionLockControl || "Blocco manuale pronostici"}</h3>
           <p className="bonus-help">
-            Stato attuale: <strong>{predictionLockModeControl}</strong>. Usa questi comandi solo come controllo di sicurezza Admin: non modificano la configurazione della lega.
+            {t.currentStatus || "Stato attuale"}: <strong>{predictionLockModeControl}</strong>. {t.predictionLockControlHelp || "Usa questi comandi solo come controllo di sicurezza Admin: non modificano la configurazione della lega."}
           </p>
           <div className="admin-actions-row" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" className="btn blue" disabled={predictionLockControlLoading} onClick={() => updatePredictionLockControl?.("AUTO")}>
-              ✅ Automatico calendario
+              ✅ {t.automaticSchedule || "Automatico calendario"}
             </button>
             <button type="button" className="btn danger" disabled={predictionLockControlLoading} onClick={() => updatePredictionLockControl?.("FORCE_LOCKED")}>
-              🔒 Blocca tutto
+              🔒 {t.lockAllPredictions || "Blocca tutto"}
             </button>
             <button type="button" className="btn green" disabled={predictionLockControlLoading} onClick={() => updatePredictionLockControl?.("FORCE_UNLOCKED")}>
-              🔓 Sblocca tutto
+              🔓 {t.unlockAllPredictions || "Sblocca tutto"}
             </button>
             <button type="button" className="btn blue" disabled={predictionLockControlLoading} onClick={() => updatePredictionLockControl?.("TEST_STARTED")}>
-              🧪 Simula torneo iniziato
+              🧪 {t.simulateTournamentStarted || "Simula torneo iniziato"}
             </button>
           </div>
           <p className="bonus-help" style={{ marginTop: 10 }}>
-            AUTO = segue date e impostazioni lega. FORCE_LOCKED = blocca ogni pronostico. FORCE_UNLOCKED = sblocca temporaneamente. TEST_STARTED = simula l'inizio torneo per testare Qualificate, Piazzamenti Gruppi e Golden Boot.
+            {t.predictionLockModesExplanation || "AUTO = segue date e impostazioni lega. FORCE_LOCKED = blocca ogni pronostico. FORCE_UNLOCKED = sblocca temporaneamente. TEST_STARTED = simula l'inizio torneo per testare Qualificate, Piazzamenti Gruppi e Golden Boot."}
           </p>
         </div>
       )}
@@ -299,8 +299,8 @@ export default function AdminPanel({
         <>
           {userAdminContent || (
             <div className="league-box">
-              <h3>👥 Utenti / Admin</h3>
-              <p className="bonus-help">Gestione utenti e autorizzazioni admin non disponibile.</p>
+              <h3>👥 {t.userAdmin || "Utenti / Admin"}</h3>
+              <p className="bonus-help">{t.userAdminUnavailable || "Gestione utenti e autorizzazioni admin non disponibile."}</p>
             </div>
           )}
         </>
@@ -309,7 +309,7 @@ export default function AdminPanel({
       {activeAdminTab === "system" && (
         <>
           <div className="admin-toolbar league-box">
-            <button className="btn blue" onClick={() => syncLiveResults(false)}>🔄 Aggiorna dati Supabase</button>
+            <button className="btn blue" onClick={() => syncLiveResults(false)}>🔄 {t.refreshSupabaseData || "Aggiorna dati Supabase"}</button>
             <button className="btn blue" onClick={recalculateLeagueData}>🔄 {t.recalculateRanking || "Ricalcola classifica"}</button>
           </div>
           <div className="admin-two-columns">

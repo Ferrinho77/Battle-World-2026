@@ -464,7 +464,8 @@ function formatLockDate(dateValue) {
 
   const date = new Date(dateValue);
 
-  return date.toLocaleString("it-IT", {
+  const locale = language === "ro" ? "ro-RO" : language === "en" ? "en-GB" : "it-IT";
+  return date.toLocaleString(locale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -476,12 +477,12 @@ function formatLockDate(dateValue) {
 function getPredictionLockText(match) {
     const date = getPredictionLockDate(match);
     const label = formatLockDate(date);
-    if (leagueSettings.prediction_lock_mode === "tournament") return `Compilabile fino alla prima partita del torneo: ${label}`;
+    if (leagueSettings.prediction_lock_mode === "tournament") return formatText(t.editableUntilTournamentStart, { date: label }) || `${t.editableUntilTournamentStart || "Compilabile fino alla prima partita del torneo"}: ${label}`;
     if (leagueSettings.prediction_lock_mode === "stage" || leagueSettings.prediction_lock_mode === "stage_round") {
-      if (String(match?.id || "").startsWith("ko-")) return `Compilabile fino alla prima partita del turno ${trRoundName(match.round)}: ${label}`;
-      return `Compilabile fino alla prima partita del torneo: ${label}`;
+      if (String(match?.id || "").startsWith("ko-")) return formatText(t.editableUntilRoundStart, { round: trRoundName(match.round), date: label }) || `${t.editableUntilRoundStart || "Compilabile fino alla prima partita del turno"} ${trRoundName(match.round)}: ${label}`;
+      return formatText(t.editableUntilTournamentStart, { date: label }) || `${t.editableUntilTournamentStart || "Compilabile fino alla prima partita del torneo"}: ${label}`;
     }
-    return `{t.editableUntilMatchKickoff} ${label}`;
+    return formatText(t.editableUntilMatchKickoff, { date: label }) || `${t.editableUntilMatchKickoff || "Compilabile fino al calcio d’inizio della partita"}: ${label}`;
   }
 
   function isPredictionLocked(match) {
@@ -1229,7 +1230,7 @@ function getPlayersInLeague() {
     }
 
     setPredictionLockModeControl(nextMode);
-    setMessage(`Blocco pronostici: ${nextMode} ✅`);
+    setMessage(`${t.predictionLockUpdated || "Blocco pronostici"}: ${nextMode} ✅`);
   }
 
   function validateLeagueSettings() {
