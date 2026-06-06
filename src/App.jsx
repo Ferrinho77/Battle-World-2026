@@ -78,26 +78,12 @@ function App() {
     bonus_final_points: 8,
     bonus_champion_points: 15,
     bonus_group_exact_points: 3,
+    control_room_allowed_emails: "",
   });
+  const [controlRoomEmailsRaw, setControlRoomEmailsRaw] = useState("");
   const [globalAdminEmails, setGlobalAdminEmails] = useState([]);
   const [newGlobalAdminEmail, setNewGlobalAdminEmail] = useState("");
   const [globalAdminsLoading, setGlobalAdminsLoading] = useState(false);
-  const [globalDashboardLoading, setGlobalDashboardLoading] = useState(false);
-  const [globalDashboardStats, setGlobalDashboardStats] = useState({
-    users: 0,
-    leagues: 0,
-    leagueMembers: 0,
-    predictions: 0,
-    topScorerPredictions: 0,
-    bonusPredictions: 0,
-    authorizedAdmins: 0,
-    recentUsers: [],
-    recentLeagues: [],
-  });
-  const [globalUsersLoading, setGlobalUsersLoading] = useState(false);
-  const [globalUsersSearch, setGlobalUsersSearch] = useState("");
-  const [globalUsers, setGlobalUsers] = useState([]);
-  const [deleteUserLoadingId, setDeleteUserLoadingId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [predictions, setPredictions] = useState({});
   const [missingPredictionFields, setMissingPredictionFields] = useState({});
@@ -107,11 +93,6 @@ function App() {
   const [allBonusPredictions, setAllBonusPredictions] = useState([]);
   const [allPredictions, setAllPredictions] = useState([]);
   const [realResults, setRealResults] = useState({});
-  const [knockoutOverrides, setKnockoutOverrides] = useState({});
-  const [predictionLockModeControl, setPredictionLockModeControl] = useState("AUTO");
-  const [predictionLockControlLoading, setPredictionLockControlLoading] = useState(false);
-  const normalizePredictionLockMode = (mode) => String(mode || "AUTO").trim().toUpperCase();
-  const effectivePredictionLockMode = normalizePredictionLockMode(predictionLockModeControl);
   const [matchEvents, setMatchEvents] = useState({});
   const [selectedTopScorer, setSelectedTopScorer] = useState("");
   const [finalTopScorer, setFinalTopScorer] = useState("");
@@ -139,12 +120,22 @@ function App() {
         );
   const t = translations[language] || translations.it;
   const currentUserEmail = String(user?.email || "").trim().toLowerCase();
+  const controlRoomEmailsSource =
+    controlRoomEmailsRaw ||
+    leagueSettings.control_room_allowed_emails ||
+    selectedLeague?.control_room_allowed_emails ||
+    "";
+  const controlRoomAllowedEmails = String(controlRoomEmailsSource)
+    .split(/[;,\n]/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
   const normalizedGlobalAdminEmails = globalAdminEmails.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean);
   const isControlRoomOwner = currentUserEmail === GLOBAL_CONTROL_ROOM_EMAIL;
   const isGlobalAdminFromTable = normalizedGlobalAdminEmails.includes(currentUserEmail);
   const isGlobalControlRoomAdmin =
     isControlRoomOwner ||
-    isGlobalAdminFromTable;
+    isGlobalAdminFromTable ||
+    controlRoomAllowedEmails.includes(currentUserEmail);
 
   function formatText(template, values = {}) {
     return String(template || "").replace(/\{(\w+)\}/g, (_, key) => values[key] ?? "");
@@ -390,32 +381,33 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (selectedLeague?.id) {
-      loadPredictionLockControl(selectedLeague.id);
-    } else {
-      setPredictionLockModeControl("AUTO");
-    }
-  }, [selectedLeague?.id]);
-
-  useEffect(() => {
-    if (user && activeTab === "admin" && isControlRoomOwner) {
-      loadGlobalDashboardStats();
-      loadGlobalUsers();
-    }
-  }, [user, activeTab, isControlRoomOwner]);
-
   const hasLiveMatches = Object.values(realResults || {}).some((result) => result && !result.finished);
 
-  // STEP 25C - Modalità gratuita 100% Supabase locale.
-  // API-Football non viene più chiamata automaticamente: risultati e live si gestiscono dalla Control Room.
+  // Smart Live API Sync:
+  // - se ci sono partite LIVE: sincronizza ogni 10 minuti
+  // - se non ci sono partite LIVE: sincronizza ogni 1 ora
+  // - i dati vengono salvati/letti da Supabase, così l'app resta leggera e non consuma chiamate inutili.
   useEffect(() => {
     if (!user) return;
+    const refreshMs = hasLiveMatches ? LIVE_REFRESH_MS : IDLE_REFRESH_MS;
     setLiveSyncMode(hasLiveMatches ? "live" : "idle");
-    setNextLiveSyncAt(null);
-    loadRealResults(true);
-    loadMatchEvents(true);
-    setLiveSyncStatus("Modalità Supabase locale: nessuna API a pagamento attiva");
+    setNextLiveSyncAt(getNextSyncDate(refreshMs));
+    syncLiveResults(true, hasLiveMatches);
+  }, [user, selectedLeague?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const refreshMs = hasLiveMatches ? LIVE_REFRESH_MS : IDLE_REFRESH_MS;
+    setLiveSyncMode(hasLiveMatches ? "live" : "idle");
+    setNextLiveSyncAt(getNextSyncDate(refreshMs));
+
+    const timer = setInterval(() => {
+      syncLiveResults(true, hasLiveMatches);
+      setNextLiveSyncAt(getNextSyncDate(refreshMs));
+    }, refreshMs);
+
+    return () => clearInterval(timer);
   }, [user, selectedLeague?.id, hasLiveMatches]);
 
   async function loadPlayers() {
@@ -464,8 +456,7 @@ function formatLockDate(dateValue) {
 
   const date = new Date(dateValue);
 
-  const locale = language === "ro" ? "ro-RO" : language === "en" ? "en-GB" : "it-IT";
-  return date.toLocaleString(locale, {
+  return date.toLocaleString("it-IT", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -477,27 +468,18 @@ function formatLockDate(dateValue) {
 function getPredictionLockText(match) {
     const date = getPredictionLockDate(match);
     const label = formatLockDate(date);
-    if (leagueSettings.prediction_lock_mode === "tournament") return formatText(t.editableUntilTournamentStart, { date: label }) || `${t.editableUntilTournamentStart || "Compilabile fino alla prima partita del torneo"}: ${label}`;
+    if (leagueSettings.prediction_lock_mode === "tournament") return `Compilabile fino alla prima partita del torneo: ${label}`;
     if (leagueSettings.prediction_lock_mode === "stage" || leagueSettings.prediction_lock_mode === "stage_round") {
-      if (String(match?.id || "").startsWith("ko-")) return formatText(t.editableUntilRoundStart, { round: trRoundName(match.round), date: label }) || `${t.editableUntilRoundStart || "Compilabile fino alla prima partita del turno"} ${trRoundName(match.round)}: ${label}`;
-      return formatText(t.editableUntilTournamentStart, { date: label }) || `${t.editableUntilTournamentStart || "Compilabile fino alla prima partita del torneo"}: ${label}`;
+      if (String(match?.id || "").startsWith("ko-")) return `Compilabile fino alla prima partita del turno ${trRoundName(match.round)}: ${label}`;
+      return `Compilabile fino alla prima partita del torneo: ${label}`;
     }
-    return formatText(t.editableUntilMatchKickoff, { date: label }) || `${t.editableUntilMatchKickoff || "Compilabile fino al calcio d’inizio della partita"}: ${label}`;
+    return `{t.editableUntilMatchKickoff} ${label}`;
   }
 
   function isPredictionLocked(match) {
-    const mode = effectivePredictionLockMode;
-    if (mode === "FORCE_LOCKED") return true;
-    if (mode === "FORCE_UNLOCKED") return false;
-
     const lockDate = getPredictionLockDate(match);
     if (!lockDate) return false;
-
-    const comparisonDate = mode === "TEST_STARTED"
-      ? new Date((getTournamentStartDate()?.getTime?.() || Date.now()) + 60 * 1000)
-      : new Date();
-
-    return comparisonDate >= new Date(lockDate);
+    return new Date() >= new Date(lockDate);
   }
 
   function getCurrentKnockoutRoundForValidation(matchList = []) {
@@ -548,9 +530,6 @@ function getPredictionLockText(match) {
   }
 
   function isTournamentStarted() {
-    const mode = effectivePredictionLockMode;
-    if (mode === "FORCE_LOCKED" || mode === "TEST_STARTED") return true;
-    if (mode === "FORCE_UNLOCKED") return false;
     const start = getTournamentStartDate();
     return !!start && new Date() >= start;
   }
@@ -721,24 +700,14 @@ function getPlayersInLeague() {
     return getGroupStandings(groupName)[position]?.team || clean;
   }
 
-  function getGroupLetter(groupName) {
-    const match = String(groupName || "").match(/([A-L])$/i);
-    return match ? match[1].toUpperCase() : "";
-  }
-
   function getBestThirdTeams() {
     const thirds = [];
     groups.forEach((group) => {
       if (getFinishedCountForGroup(group.name) < 6) return;
       const third = getGroupStandings(group.name)[2];
-      if (third) thirds.push({ ...third, groupLetter: getGroupLetter(group.name) });
+      if (third) thirds.push(third);
     });
-    return thirds.sort((a, b) =>
-      b.points - a.points ||
-      b.gd - a.gd ||
-      b.gf - a.gf ||
-      String(a.team || "").localeCompare(String(b.team || ""))
-    );
+    return thirds.sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf);
   }
 
   function getKnockoutKickoff(round, index) {
@@ -765,32 +734,16 @@ function getPlayersInLeague() {
       "Finale 3° posto": "F3",
       Finale: "F",
     };
+    let thirdIndex = 0;
     const bestThirds = getBestThirdTeams();
-    const usedThirdGroups = new Set();
     const codeMap = {};
-
-    const resolveBestThirdToken = (clean) => {
-      const match = clean.match(/^3([A-L]+)$/i);
-      if (!match) return null;
-      const allowedGroups = match[1].toUpperCase().split("");
-      const candidate = bestThirds.find((third) =>
-        allowedGroups.includes(third.groupLetter) && !usedThirdGroups.has(third.groupLetter)
-      );
-      if (!candidate) return clean;
-      usedThirdGroups.add(candidate.groupLetter);
-      return candidate.team;
-    };
 
     const resolveToken = (token) => {
       const clean = String(token).trim();
-      const bestThirdToken = resolveBestThirdToken(clean);
-      if (bestThirdToken) return bestThirdToken;
-
       if (clean.includes("Migliore 3ª")) {
-        const candidate = bestThirds.find((third) => !usedThirdGroups.has(third.groupLetter));
-        if (!candidate) return clean;
-        usedThirdGroups.add(candidate.groupLetter);
-        return candidate.team;
+        const team = bestThirds[thirdIndex]?.team || `Migliore 3ª ${thirdIndex + 1}`;
+        thirdIndex += 1;
+        return team;
       }
 
       const winner = clean.match(/^Vincente\s+(.+)$/i);
@@ -799,7 +752,6 @@ function getPlayersInLeague() {
         if (!source) return clean;
         const result = realResults[source.id];
         if (!result?.finished) return clean;
-        if (result.qualified_team) return result.qualified_team;
         if (Number(result.home_score) === Number(result.away_score)) return clean;
         return Number(result.home_score) > Number(result.away_score) ? source.home : source.away;
       }
@@ -810,10 +762,6 @@ function getPlayersInLeague() {
         if (!source) return clean;
         const result = realResults[source.id];
         if (!result?.finished) return clean;
-        if (result.qualified_team) {
-          if (result.qualified_team === source.home) return source.away;
-          if (result.qualified_team === source.away) return source.home;
-        }
         if (Number(result.home_score) === Number(result.away_score)) return clean;
         return Number(result.home_score) > Number(result.away_score) ? source.away : source.home;
       }
@@ -827,12 +775,8 @@ function getPlayersInLeague() {
       round.matches.forEach((label, index) => {
         const [homeRaw, awayRaw] = label.split(" - ").map((x) => x.trim());
         const code = prefix === "F" ? "F" : prefix === "F3" ? "F3" : `${prefix}${index + 1}`;
-        const id = `ko-${code.toLowerCase()}`;
-        const override = knockoutOverrides[id];
-        const autoHome = resolveToken(homeRaw);
-        const autoAway = resolveToken(awayRaw);
         const item = {
-          id,
+          id: `ko-${code.toLowerCase()}`,
           code,
           round: round.round,
           group: round.round,
@@ -840,11 +784,8 @@ function getPlayersInLeague() {
           kickoff: getKnockoutKickoff(round.round, index),
           homeRaw,
           awayRaw,
-          autoHome,
-          autoAway,
-          home: override?.home_team || autoHome,
-          away: override?.away_team || autoAway,
-          manualOverride: !!override,
+          home: resolveToken(homeRaw),
+          away: resolveToken(awayRaw),
         };
         codeMap[code] = item;
         list.push(item);
@@ -857,21 +798,14 @@ function getPlayersInLeague() {
   function getWinnerFromMatch(matchId) {
     const ko = buildKnockoutMatches().find((m) => m.id === matchId);
     const result = realResults[matchId];
-    if (!ko || !result?.finished) return "";
-    if (result.qualified_team) return result.qualified_team;
-    if (Number(result.home_score) === Number(result.away_score)) return "";
+    if (!ko || !result?.finished || Number(result.home_score) === Number(result.away_score)) return "";
     return Number(result.home_score) > Number(result.away_score) ? ko.home : ko.away;
   }
 
   function getLoserFromMatch(matchId) {
     const ko = buildKnockoutMatches().find((m) => m.id === matchId);
     const result = realResults[matchId];
-    if (!ko || !result?.finished) return "";
-    if (result.qualified_team) {
-      if (result.qualified_team === ko.home) return ko.away;
-      if (result.qualified_team === ko.away) return ko.home;
-    }
-    if (Number(result.home_score) === Number(result.away_score)) return "";
+    if (!ko || !result?.finished || Number(result.home_score) === Number(result.away_score)) return "";
     return Number(result.home_score) > Number(result.away_score) ? ko.away : ko.home;
   }
 
@@ -1185,52 +1119,11 @@ function getPlayersInLeague() {
         bonus_final_points: data.bonus_final_points ?? 8,
         bonus_champion_points: data.bonus_champion_points ?? 15,
         bonus_group_exact_points: data.bonus_group_exact_points ?? 3,
+        control_room_allowed_emails: data.control_room_allowed_emails ?? "",
       });
+      setControlRoomEmailsRaw(data.control_room_allowed_emails ?? "");
       setIsAdmin(data.owner_id === user.id);
     }
-  }
-
-  async function loadPredictionLockControl(leagueId) {
-    if (!leagueId) return;
-    const { data, error } = await supabase
-      .from("prediction_lock_control")
-      .select("lock_mode")
-      .eq("league_id", leagueId)
-      .maybeSingle();
-
-    if (!error && data?.lock_mode) {
-      setPredictionLockModeControl(normalizePredictionLockMode(data.lock_mode));
-      return;
-    }
-
-    await supabase.from("prediction_lock_control").upsert({
-      league_id: leagueId,
-      lock_mode: "AUTO",
-      updated_by: user?.id || null,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "league_id" });
-    setPredictionLockModeControl("AUTO");
-  }
-
-  async function updatePredictionLockControl(mode) {
-    if (!selectedLeague?.id) return;
-    const nextMode = normalizePredictionLockMode(mode);
-    setPredictionLockControlLoading(true);
-    const { error } = await supabase.from("prediction_lock_control").upsert({
-      league_id: selectedLeague.id,
-      lock_mode: nextMode,
-      updated_by: user?.id || null,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "league_id" });
-    setPredictionLockControlLoading(false);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setPredictionLockModeControl(nextMode);
-    setMessage(`${t.predictionLockUpdated || "Blocco pronostici"}: ${nextMode} ✅`);
   }
 
   function validateLeagueSettings() {
@@ -1296,9 +1189,9 @@ function getPlayersInLeague() {
     if (!validateLeagueSettings()) return;
 
     const settingsToSave = { ...leagueSettings };
-    // Step 20E: le email Control Room non sono più una configurazione di lega.
-    // Gli accessi globali si gestiscono solo dalla tabella authorized_admins.
-    delete settingsToSave.control_room_allowed_emails;
+    if (currentUserEmail !== GLOBAL_CONTROL_ROOM_EMAIL) {
+      delete settingsToSave.control_room_allowed_emails;
+    }
 
     const { error } = await supabase.from("leagues").update(settingsToSave).eq("id", selectedLeague.id);
     if (error) { setMessage(error.message); return; }
@@ -1323,271 +1216,7 @@ function getPlayersInLeague() {
     setGlobalAdminEmails((data || []).map((row) => String(row.email || "").trim().toLowerCase()).filter(Boolean));
   }
 
-  async function getTableCount(tableName) {
-    const { count, error } = await supabase
-      .from(tableName)
-      .select("*", { count: "exact", head: true });
-
-    if (error) {
-      console.warn(`Global dashboard count error (${tableName}):`, error.message);
-      return 0;
-    }
-
-    return count || 0;
-  }
-
-  async function loadGlobalDashboardStats() {
-    if (!isControlRoomOwner) return;
-
-    setGlobalDashboardLoading(true);
-
-    const [usersCount, leaguesCount, membersCount, predictionsCount, topScorerCount, bonusCount, adminsCount] = await Promise.all([
-      getTableCount("profiles"),
-      getTableCount("leagues"),
-      getTableCount("league_members"),
-      getTableCount("predictions"),
-      getTableCount("top_scorer_predictions"),
-      getTableCount("bonus_predictions"),
-      getTableCount("authorized_admins"),
-    ]);
-
-    const { data: recentUsers, error: recentUsersError } = await supabase
-      .from("profiles")
-      .select("id, username, email, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5);
-
-    const { data: recentLeagues, error: recentLeaguesError } = await supabase
-      .from("leagues")
-      .select("id, name, code, owner_id, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5);
-
-    if (recentUsersError) console.warn("Recent users not available:", recentUsersError.message);
-    if (recentLeaguesError) console.warn("Recent leagues not available:", recentLeaguesError.message);
-
-    setGlobalDashboardStats({
-      users: usersCount,
-      leagues: leaguesCount,
-      leagueMembers: membersCount,
-      predictions: predictionsCount,
-      topScorerPredictions: topScorerCount,
-      bonusPredictions: bonusCount,
-      authorizedAdmins: adminsCount,
-      recentUsers: recentUsers || [],
-      recentLeagues: recentLeagues || [],
-    });
-
-    setGlobalDashboardLoading(false);
-  }
-
-  function formatGlobalDate(value) {
-    if (!value) return "-";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "-";
-    return date.toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  }
-
-  function isEmailGlobalAdmin(email) {
-    const cleanEmail = String(email || "").trim().toLowerCase();
-    if (!cleanEmail) return false;
-    return cleanEmail === GLOBAL_CONTROL_ROOM_EMAIL || normalizedGlobalAdminEmails.includes(cleanEmail);
-  }
-
-  async function loadGlobalUsers(searchValue = globalUsersSearch) {
-    if (!isControlRoomOwner) return;
-
-    const cleanSearch = String(searchValue || "").trim();
-    setGlobalUsersLoading(true);
-
-    try {
-      const pageSize = 1000;
-      let page = 0;
-      let profilesList = [];
-      let hasMore = true;
-
-      while (hasMore) {
-        let query = supabase
-          .from("profiles")
-          .select("id, username, email, created_at")
-          .order("created_at", { ascending: false })
-          .range(page * pageSize, page * pageSize + pageSize - 1);
-
-        if (cleanSearch) {
-          const safeSearch = cleanSearch.replace(/[%,()]/g, "");
-          query = query.or(`username.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-
-        const rows = data || [];
-        profilesList = [...profilesList, ...rows];
-        hasMore = rows.length === pageSize;
-        page += 1;
-      }
-
-      const userIds = profilesList.map((profile) => profile.id).filter(Boolean);
-      let membershipsByUser = {};
-
-      if (userIds.length > 0) {
-        const membershipRows = [];
-        for (let i = 0; i < userIds.length; i += 200) {
-          const chunk = userIds.slice(i, i + 200);
-          const { data, error } = await supabase
-            .from("league_members")
-            .select("user_id, role, league_id")
-            .in("user_id", chunk);
-
-          if (error) {
-            console.warn("Global users memberships not available:", error.message);
-          } else {
-            membershipRows.push(...(data || []));
-          }
-        }
-
-        const leagueIds = [...new Set(membershipRows.map((item) => item.league_id).filter(Boolean))];
-        const leaguesById = {};
-
-        if (leagueIds.length > 0) {
-          for (let i = 0; i < leagueIds.length; i += 200) {
-            const chunk = leagueIds.slice(i, i + 200);
-            const { data, error } = await supabase
-              .from("leagues")
-              .select("id, name, code")
-              .in("id", chunk);
-
-            if (error) {
-              console.warn("Global users leagues not available:", error.message);
-            } else {
-              (data || []).forEach((league) => {
-                leaguesById[league.id] = league;
-              });
-            }
-          }
-        }
-
-        membershipsByUser = membershipRows.reduce((acc, item) => {
-          const league = leaguesById[item.league_id];
-          const leagueName = league?.name || item.league_id || "Lega";
-          const leagueCode = league?.code ? ` (${league.code})` : "";
-          const roleText = item.role ? ` - ${item.role}` : "";
-          const label = `${leagueName}${leagueCode}${roleText}`;
-          acc[item.user_id] = [...(acc[item.user_id] || []), label];
-          return acc;
-        }, {});
-      }
-
-      setGlobalUsers(profilesList.map((profile) => ({
-        ...profile,
-        email: String(profile.email || "").trim().toLowerCase(),
-        memberships: membershipsByUser[profile.id] || [],
-      })));
-    } catch (error) {
-      console.warn("Global users loading failed:", error.message);
-      setMessage(error.message);
-    } finally {
-      setGlobalUsersLoading(false);
-    }
-  }
-
-  async function authorizeProfileAsGlobalAdmin(email) {
-    if (!isControlRoomOwner) {
-      setMessage("Solo il Super Admin può autorizzare altri Global Admin.");
-      return;
-    }
-
-    const cleanEmail = String(email || "").trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes("@")) {
-      setMessage("Email utente non valida.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("authorized_admins")
-      .upsert({ email: cleanEmail }, { onConflict: "email" });
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    await loadAuthorizedAdmins();
-    await loadGlobalDashboardStats();
-    setMessage(`Global Admin autorizzato: ${cleanEmail} ✅`);
-  }
-
-  async function removeProfileGlobalAdmin(email) {
-    if (!isControlRoomOwner) {
-      setMessage("Solo il Super Admin può rimuovere Global Admin.");
-      return;
-    }
-
-    const cleanEmail = String(email || "").trim().toLowerCase();
-    if (cleanEmail === GLOBAL_CONTROL_ROOM_EMAIL) {
-      setMessage("Questa email è il proprietario principale e non può essere rimossa dall'app.");
-      return;
-    }
-
-    await removeGlobalAdminEmail(cleanEmail);
-    await loadGlobalDashboardStats();
-  }
-
-  async function deleteGlobalUserComplete(profile) {
-    if (!isControlRoomOwner) {
-      setMessage("Solo il Super Admin può cancellare utenti.");
-      return;
-    }
-
-    const targetUserId = profile?.id;
-    const targetEmail = String(profile?.email || "").trim().toLowerCase();
-
-    if (!targetUserId || !targetEmail) {
-      setMessage("Utente non valido.");
-      return;
-    }
-
-    if (targetEmail === GLOBAL_CONTROL_ROOM_EMAIL || targetUserId === user?.id) {
-      setMessage("Questo account è protetto e non può essere cancellato dall'app.");
-      return;
-    }
-
-    const typedEmail = window.prompt(`Per cancellare definitivamente questo utente e tutti i suoi dati, riscrivi la sua email:
-
-${targetEmail}`);
-    if (String(typedEmail || "").trim().toLowerCase() !== targetEmail) {
-      setMessage("Cancellazione annullata: email non confermata.");
-      return;
-    }
-
-    setDeleteUserLoadingId(targetUserId);
-    const { data, error } = await supabase.functions.invoke("delete-user-complete", {
-      body: { user_id: targetUserId, email: targetEmail },
-    });
-    setDeleteUserLoadingId(null);
-
-    if (error) {
-      setMessage(error.message || "Errore durante la cancellazione utente.");
-      return;
-    }
-
-    if (data?.error) {
-      setMessage(data.error);
-      return;
-    }
-
-    await loadAuthorizedAdmins();
-    await loadGlobalDashboardStats();
-    await loadGlobalUsers(globalUsersSearch);
-    setMessage(`Utente cancellato definitivamente: ${targetEmail} ✅`);
-  }
-
   async function addGlobalAdminEmail() {
-    if (!isControlRoomOwner) {
-      setMessage("Solo il Super Admin può autorizzare altri Global Admin.");
-      return;
-    }
-
     const cleanEmail = String(newGlobalAdminEmail || "").trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes("@")) {
       setMessage("Inserisci una email valida.");
@@ -1605,17 +1234,10 @@ ${targetEmail}`);
 
     setNewGlobalAdminEmail("");
     await loadAuthorizedAdmins();
-    await loadGlobalDashboardStats();
-    await loadGlobalUsers();
     setMessage(`Global Admin autorizzato: ${cleanEmail} ✅`);
   }
 
   async function removeGlobalAdminEmail(emailToRemove) {
-    if (!isControlRoomOwner) {
-      setMessage("Solo il Super Admin può rimuovere Global Admin.");
-      return;
-    }
-
     const cleanEmail = String(emailToRemove || "").trim().toLowerCase();
     if (!cleanEmail) return;
 
@@ -1638,8 +1260,6 @@ ${targetEmail}`);
     }
 
     await loadAuthorizedAdmins();
-    await loadGlobalDashboardStats();
-    await loadGlobalUsers();
     setMessage(`Global Admin rimosso: ${cleanEmail} ✅`);
   }
 
@@ -1775,14 +1395,34 @@ ${targetEmail}`);
   }
 
   async function syncLiveResults(silent = false, liveMode = hasLiveMatches) {
-    // STEP 25C: il pulsante non chiama più API-Football.
-    // Serve solo ad aggiornare i dati locali salvati in Supabase dalla Control Room.
-    setLiveSyncMode(liveMode ? "live" : "idle");
-    setNextLiveSyncAt(null);
-    await loadRealResults(true);
-    await loadMatchEvents(true);
-    setLiveSyncStatus("Dati aggiornati da Supabase locale ✅");
-    if (!silent) setMessage("Dati locali Supabase aggiornati ✅");
+    try {
+      setLiveSyncStatus(silent ? "" : "Sincronizzazione live in corso...");
+      const refreshMs = liveMode ? LIVE_REFRESH_MS : IDLE_REFRESH_MS;
+      setLiveSyncMode(liveMode ? "live" : "idle");
+      setNextLiveSyncAt(getNextSyncDate(refreshMs));
+      const { data, error } = await supabase.functions.invoke("sync-live-results", {
+        body: {
+          league_id: selectedLeague?.__global ? null : (selectedLeague?.id || null),
+          mode: liveMode ? "live" : "idle",
+          interval_minutes: liveMode ? 10 : 60,
+          has_live_matches: Boolean(liveMode),
+        }
+      });
+      if (error) throw error;
+      await loadRealResults(true);
+      await loadMatchEvents(true);
+      const updated = data?.updated ?? 0;
+      const skipped = data?.skipped ?? 0;
+      setLiveSyncStatus(`Sync ${liveMode ? "LIVE" : "1H"} OK: ${updated} aggiornati${skipped ? `, ${skipped} non mappati` : ""}`);
+      if (!silent) setMessage("Risultati live sincronizzati ✅");
+    } catch (error) {
+      // Fallback: se Edge Function/API non è configurata, non blocchiamo l'app.
+      await loadRealResults(true);
+      await loadMatchEvents(true);
+      setLiveSyncStatus("Live API non configurata: uso risultati Control Room/Supabase");
+      setNextLiveSyncAt(getNextSyncDate(liveMode ? LIVE_REFRESH_MS : IDLE_REFRESH_MS));
+      if (!silent) setMessage(error?.message || "Live API non configurata");
+    }
   }
 
   async function loadRealResults(silent = false) {
@@ -1821,67 +1461,7 @@ ${targetEmail}`);
     setMatchEvents(formatted);
   }
 
-  async function loadKnockoutOverrides(leagueId = selectedLeague?.id) {
-    if (!leagueId || leagueId === "GLOBAL_CONTROL_ROOM") {
-      setKnockoutOverrides({});
-      return;
-    }
-    const { data, error } = await supabase
-      .from("knockout_overrides")
-      .select("match_id, home_team, away_team")
-      .eq("league_id", leagueId);
-    if (error) {
-      console.warn("knockout_overrides not available:", error.message);
-      setKnockoutOverrides({});
-      return;
-    }
-    const formatted = {};
-    (data || []).forEach((row) => {
-      formatted[row.match_id] = { home_team: row.home_team, away_team: row.away_team };
-    });
-    setKnockoutOverrides(formatted);
-  }
-
-  async function saveKnockoutOverride(matchId, homeTeam, awayTeam) {
-    if (!selectedLeague?.id || selectedLeague?.__global) return;
-    if (!homeTeam || !awayTeam) {
-      setMessage("Seleziona entrambe le squadre del tabellone.");
-      return;
-    }
-    const { error } = await supabase.from("knockout_overrides").upsert(
-      {
-        league_id: selectedLeague.id,
-        match_id: matchId,
-        home_team: homeTeam,
-        away_team: awayTeam,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "league_id,match_id" }
-    );
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-    await loadKnockoutOverrides(selectedLeague.id);
-    setMessage("Tabellone aggiornato manualmente ✅");
-  }
-
-  async function clearKnockoutOverride(matchId) {
-    if (!selectedLeague?.id || selectedLeague?.__global) return;
-    const { error } = await supabase
-      .from("knockout_overrides")
-      .delete()
-      .eq("league_id", selectedLeague.id)
-      .eq("match_id", matchId);
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-    await loadKnockoutOverrides(selectedLeague.id);
-    setMessage("Slot ripristinato automatico ✅");
-  }
-
-  async function saveRealResult(matchId, home, away, finished = true, qualifiedTeam = null, winType = null) {
+  async function saveRealResult(matchId, home, away, finished = true) {
     if (home === "" || away === "") { setMessage(t.enterRealResult); return; }
     const homeScore = Number(home);
     const awayScore = Number(away);
@@ -1889,10 +1469,7 @@ ${targetEmail}`);
       setMessage(t.enterRealResult);
       return;
     }
-    const { error } = await supabase.from("real_results").upsert(
-      { match_id: matchId, home_score: homeScore, away_score: awayScore, finished, qualified_team: qualifiedTeam || null, win_type: winType || null },
-      { onConflict: "match_id" }
-    );
+    const { error } = await supabase.from("real_results").upsert({ match_id: matchId, home_score: homeScore, away_score: awayScore, finished });
     if (error) { setMessage(error.message); return; }
     await loadRealResults();
     await loadMatchEvents(true);
@@ -1912,7 +1489,6 @@ ${targetEmail}`);
       await loadAllBonusPredictions(selectedLeague.id);
       await loadAllTopScorerPredictions(selectedLeague.id);
       await loadLeagueSettings(selectedLeague.id);
-      await loadKnockoutOverrides(selectedLeague.id);
     }
     setMessage("Classifica ricalcolata ✅");
   }
@@ -2028,14 +1604,13 @@ ${targetEmail}`);
 
   function openLeague(league) {
     setSelectedLeague(league);
+    setControlRoomEmailsRaw(league.control_room_allowed_emails || "");
     setActiveTab("home");
     loadAllPredictions(league.id);
     loadLeagueParticipants(league.id);
     loadAllTopScorerPredictions(league.id);
     loadAllBonusPredictions(league.id);
-    loadKnockoutOverrides(league.id);
     loadLeagueSettings(league.id);
-    loadPredictionLockControl(league.id);
     if (user?.id) {
       loadPredictions(user.id, league.id);
       loadTopScorerPrediction(user.id, league.id);
@@ -2323,15 +1898,12 @@ ${targetEmail}`);
     if (!topScorerGoalsPlayer) { setMessage(t.selectPlayerMessage); return; }
     if (topScorerGoals === "" || Number(topScorerGoals) < 0) { setMessage(t.enterRealResult); return; }
     const prefix = topScorerGoalsPrefix();
-    const { error } = await supabase.from("real_results").upsert(
-      {
-        match_id: `${prefix}${encodeTopScorer(topScorerGoalsPlayer)}`,
-        home_score: Number(topScorerGoals),
-        away_score: 0,
-        finished: false,
-      },
-      { onConflict: "match_id" }
-    );
+    const { error } = await supabase.from("real_results").upsert({
+      match_id: `${prefix}${encodeTopScorer(topScorerGoalsPlayer)}`,
+      home_score: Number(topScorerGoals),
+      away_score: 0,
+      finished: false,
+    });
     if (error) { setMessage(error.message); return; }
     await loadRealResults();
     setMessage(`${t.liveResultSaved}: ${topScorerGoalsPlayer} (${topScorerGoals}) 🔵`);
@@ -2517,7 +2089,24 @@ ${targetEmail}`);
 
   function getSmartNotifications(knockoutMatches = [], nextDeadline = null) {
     const notifications = [];
-    const allPredictionMatches = [...matches, ...knockoutMatches];
+
+    // Non contare nei "pronostici mancanti" le partite della fase finale
+    // che non sono ancora realmente disponibili. Prima che le squadre siano
+    // determinate, i match KO contengono segnaposto tipo "1A", "Vincente S1",
+    // "Migliore 3ª", ecc. e non devono creare l'avviso "ti mancano 32 partite".
+    const isRealTeam = (team) => {
+      const value = String(team || "").trim();
+      if (!value) return false;
+      return allTeams.includes(value);
+    };
+
+    const isAvailablePredictionMatch = (match) => {
+      const isKnockout = String(match.id || "").startsWith("ko-");
+      if (!isKnockout) return true;
+      return isRealTeam(match.home) && isRealTeam(match.away);
+    };
+
+    const allPredictionMatches = [...matches, ...knockoutMatches].filter(isAvailablePredictionMatch);
 
     const editableMatches = allPredictionMatches.filter((match) => !isPredictionLocked(match));
     const missingMatches = editableMatches.filter((match) => {
@@ -3120,6 +2709,19 @@ ${targetEmail}`);
             <p>{t.liveApiInfo}</p>
             <p><strong>{t.syncStatus}:</strong> {liveSyncStatus || t.waitingFirstSync}</p>
           </div>
+          {String(user?.email || "").toLowerCase() === "fabioferrigno1@hotmail.com" && (
+            <div className="league-box owner-only-control-room-box">
+              <h3>🛠️ {t.controlRoomAccess}</h3>
+              <label>{t.controlRoomAllowedEmails}</label>
+              <textarea
+                rows="3"
+                placeholder={t.controlRoomAllowedEmailsPlaceholder}
+                value={leagueSettings.control_room_allowed_emails || ""}
+                onChange={(e) => { setLeagueSettings({ ...leagueSettings, control_room_allowed_emails: e.target.value }); setControlRoomEmailsRaw(e.target.value); }}
+              />
+              <p className="bonus-help">{t.controlRoomAllowedEmailsHelp}</p>
+            </div>
+          )}
           <div className="league-box">
             <h3>⚽ {t.matchPointsSettings}</h3>
             <div className="bonus-settings-grid">
@@ -3414,33 +3016,48 @@ ${targetEmail}`);
         </>}
 
         {activeTab === "admin" && isGlobalControlRoomAdmin && (
-          <div className="global-cr-mobile-fix">
-            <style>{`
-              @media (max-width: 700px) {
-                .global-cr-mobile-fix { width: 100%; max-width: 100%; overflow-x: hidden; }
-                .global-cr-mobile-fix .league-box { width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; }
-                .global-cr-mobile-fix .global-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
-                .global-cr-mobile-fix .global-stat-card { padding: 10px !important; min-width: 0; }
-                .global-cr-mobile-fix .global-dashboard-lists { grid-template-columns: 1fr !important; }
-                .global-cr-mobile-fix .admin-email-row { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
-                .global-cr-mobile-fix .admin-email-row input,
-                .global-cr-mobile-fix .admin-email-row button,
-                .global-cr-mobile-fix .btn { width: 100%; max-width: 100%; box-sizing: border-box; }
-                .global-cr-mobile-fix .participants-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
-                .global-cr-mobile-fix .participants-table { min-width: 640px; width: max-content; }
-                .global-cr-mobile-fix .global-users-table { min-width: 0 !important; width: 100% !important; }
-                .global-cr-mobile-fix .global-users-table thead { display: none; }
-                .global-cr-mobile-fix .global-users-table,
-                .global-cr-mobile-fix .global-users-table tbody,
-                .global-cr-mobile-fix .global-users-table tr,
-                .global-cr-mobile-fix .global-users-table td { display: block; width: 100%; box-sizing: border-box; }
-                .global-cr-mobile-fix .global-users-table tr { margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 10px; background: rgba(255,255,255,0.04); }
-                .global-cr-mobile-fix .global-users-table td { border: 0 !important; padding: 6px 0 !important; overflow-wrap: anywhere; }
-                .global-cr-mobile-fix .global-users-table td::before { content: attr(data-label); display: block; font-weight: 800; color: #9fb1c8; margin-bottom: 2px; }
-                .global-cr-mobile-fix .global-users-table td:last-child > div { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
-              }
-            `}</style>
-
+          <>
+            <div className="league-box owner-only-control-room-box">
+              <h2>🌍 Global Control Room Admins</h2>
+              <p className="bonus-help">
+                Autorizza email globalmente alla Control Room. Questi utenti potranno entrare anche se non sono membri di nessuna lega.
+              </p>
+              <div className="admin-email-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <input
+                  type="email"
+                  placeholder="email@esempio.com"
+                  value={newGlobalAdminEmail}
+                  onChange={(e) => setNewGlobalAdminEmail(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") addGlobalAdminEmail(); }}
+                  style={{ flex: "1 1 260px" }}
+                />
+                <button type="button" className="btn green" onClick={addGlobalAdminEmail}>➕ Aggiungi Admin</button>
+                <button type="button" className="btn blue" onClick={loadAuthorizedAdmins}>🔄 Aggiorna</button>
+              </div>
+              <div className="participants-table-wrap" style={{ marginTop: 12 }}>
+                <table className="participants-table">
+                  <thead>
+                    <tr><th>Email autorizzata</th><th>Azione</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{GLOBAL_CONTROL_ROOM_EMAIL} <strong>👑 Owner</strong></td>
+                      <td><span className="bonus-help">Protetta</span></td>
+                    </tr>
+                    {globalAdminsLoading && <tr><td colSpan="2">Caricamento...</td></tr>}
+                    {normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).map((adminEmail) => (
+                      <tr key={adminEmail}>
+                        <td>{adminEmail}</td>
+                        <td><button type="button" className="btn danger" onClick={() => removeGlobalAdminEmail(adminEmail)}>❌ Rimuovi</button></td>
+                      </tr>
+                    ))}
+                    {!globalAdminsLoading && normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).length === 0 && (
+                      <tr><td colSpan="2">Nessun altro Global Admin autorizzato.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
             <AdminPanel
             t={t}
@@ -3465,220 +3082,8 @@ ${targetEmail}`);
             finalTopScorer={finalTopScorer}
             setFinalTopScorer={setFinalTopScorer}
             saveFinalTopScorer={saveFinalTopScorer}
-            allTeams={allTeams}
-            knockoutMatches={knockoutMatches}
-            knockoutOverrides={knockoutOverrides}
-            saveKnockoutOverride={saveKnockoutOverride}
-            clearKnockoutOverride={clearKnockoutOverride}
-            predictionLockModeControl={effectivePredictionLockMode}
-            predictionLockControlLoading={predictionLockControlLoading}
-            updatePredictionLockControl={updatePredictionLockControl}
-            userAdminContent={
-isControlRoomOwner ? (
-              <>
-            <div className="league-box owner-only-control-room-box">
-              <h2>📊 Global Control Room Dashboard</h2>
-              <p className="bonus-help">
-                Panoramica generale dell'app: utenti, leghe, pronostici e autorizzazioni globali.
-              </p>
-              <div className="global-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 14 }}>
-                {[
-                  ["👥 Utenti", globalDashboardStats.users],
-                  ["🏆 Leghe", globalDashboardStats.leagues],
-                  ["🤝 Membri Leghe", globalDashboardStats.leagueMembers],
-                  ["🎯 Pronostici", globalDashboardStats.predictions],
-                  ["🥾 Capocannoniere", globalDashboardStats.topScorerPredictions],
-                  ["⭐ Bonus", globalDashboardStats.bonusPredictions],
-                  ["🔐 Global Admin", globalDashboardStats.authorizedAdmins],
-                ].map(([label, value]) => (
-                  <div key={label} className="league-box global-stat-card" style={{ margin: 0, padding: 12 }}>
-                    <div className="bonus-help">{label}</div>
-                    <strong style={{ fontSize: 26 }}>{globalDashboardLoading ? "..." : value}</strong>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
-                <button type="button" className="btn blue" onClick={loadGlobalDashboardStats}>🔄 Aggiorna Dashboard</button>
-                <button type="button" className="btn blue" onClick={loadAuthorizedAdmins}>🔄 Aggiorna Admin</button>
-              </div>
-              <div className="global-dashboard-lists" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginTop: 14 }}>
-                <div className="participants-table-wrap">
-                  <h3>🆕 Ultimi utenti</h3>
-                  <table className="participants-table">
-                    <thead><tr><th>Utente</th><th>Email</th><th>Data</th></tr></thead>
-                    <tbody>
-                      {globalDashboardStats.recentUsers.map((profile) => (
-                        <tr key={profile.id}>
-                          <td data-label="Username">{profile.username || "-"}</td>
-                          <td>{profile.email || "-"}</td>
-                          <td data-label="Registrazione">{formatGlobalDate(profile.created_at)}</td>
-                        </tr>
-                      ))}
-                      {!globalDashboardLoading && globalDashboardStats.recentUsers.length === 0 && <tr><td colSpan="3">Nessun dato disponibile.</td></tr>}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="participants-table-wrap">
-                  <h3>🏆 Ultime leghe</h3>
-                  <table className="participants-table">
-                    <thead><tr><th>Lega</th><th>Codice</th><th>Data</th></tr></thead>
-                    <tbody>
-                      {globalDashboardStats.recentLeagues.map((league) => (
-                        <tr key={league.id}>
-                          <td>{league.name || "-"}</td>
-                          <td>{league.code || "-"}</td>
-                          <td>{formatGlobalDate(league.created_at)}</td>
-                        </tr>
-                      ))}
-                      {!globalDashboardLoading && globalDashboardStats.recentLeagues.length === 0 && <tr><td colSpan="3">Nessun dato disponibile.</td></tr>}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div className="league-box owner-only-control-room-box">
-              <h2>👥 Global Users Management</h2>
-              <p className="bonus-help">
-                Cerca utenti registrati, controlla le leghe associate e gestisci lo stato Global Admin.
-                Le autorizzazioni possono essere modificate solo dal Super Admin.
-              </p>
-              <div className="admin-email-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
-                <input
-                  type="text"
-                  placeholder="Cerca per email o username..."
-                  value={globalUsersSearch}
-                  onChange={(e) => setGlobalUsersSearch(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") loadGlobalUsers(); }}
-                  style={{ flex: "1 1 260px" }}
-                />
-                <button type="button" className="btn blue" onClick={() => loadGlobalUsers()}>🔍 Cerca</button>
-                <button type="button" className="btn blue" onClick={() => { setGlobalUsersSearch(""); loadGlobalUsers(""); }}>🔄 Reset</button>
-              </div>
-
-              {!isControlRoomOwner && (
-                <div className="global-validation-alert" style={{ marginTop: 10 }}>
-                  🔒 Puoi consultare gli utenti, ma solo il Super Admin può autorizzare o rimuovere Global Admin.
-                </div>
-              )}
-
-              <div className="participants-table-wrap" style={{ marginTop: 12 }}>
-                <table className="participants-table global-users-table">
-                  <thead>
-                    <tr>
-                      <th>Username</th>
-                      <th>Email</th>
-                      <th>Leghe</th>
-                      <th>Registrazione</th>
-                      <th>Stato</th>
-                      <th>Azione</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {globalUsersLoading && <tr><td colSpan="6">Caricamento utenti...</td></tr>}
-                    {!globalUsersLoading && globalUsers.map((profile) => {
-                      const profileEmail = String(profile.email || "").trim().toLowerCase();
-                      const profileIsGlobalAdmin = isEmailGlobalAdmin(profileEmail);
-                      const isSuperAdminProfile = profileEmail === GLOBAL_CONTROL_ROOM_EMAIL;
-
-                      return (
-                        <tr key={profile.id}>
-                          <td>{profile.username || "-"}</td>
-                          <td data-label="Email">{profileEmail || "-"}</td>
-                          <td data-label="Leghe">{profile.memberships.length > 0 ? profile.memberships.join(", ") : "Nessuna lega"}</td>
-                          <td>{formatGlobalDate(profile.created_at)}</td>
-                          <td data-label="Stato">{isSuperAdminProfile ? "👑 Super Admin" : profileIsGlobalAdmin ? "🔐 Global Admin" : "Utente"}</td>
-                          <td data-label="Azione">
-                            {isSuperAdminProfile ? (
-                              <span className="bonus-help">Protetto</span>
-                            ) : isControlRoomOwner ? (
-                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                {profileIsGlobalAdmin ? (
-                                  <button type="button" className="btn danger" onClick={() => removeProfileGlobalAdmin(profileEmail)}>❌ Rimuovi Admin</button>
-                                ) : (
-                                  <button type="button" className="btn green" onClick={() => authorizeProfileAsGlobalAdmin(profileEmail)}>➕ Autorizza</button>
-                                )}
-                                <button
-                                  type="button"
-                                  className="btn danger"
-                                  disabled={deleteUserLoadingId === profile.id}
-                                  onClick={() => deleteGlobalUserComplete(profile)}
-                                >
-                                  {deleteUserLoadingId === profile.id ? "Cancellazione..." : "🗑️ Cancella utente"}
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="bonus-help">Solo lettura</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {!globalUsersLoading && globalUsers.length === 0 && (
-                      <tr><td colSpan="6">Nessun utente trovato.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="league-box owner-only-control-room-box">
-              <h2>🌍 Global Control Room Admins</h2>
-              <p className="bonus-help">
-                I Global Admin possono entrare nella Control Room. Solo il Super Admin può aggiungere o rimuovere altri Global Admin.
-              </p>
-              {isControlRoomOwner ? (
-                <div className="admin-email-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <input
-                    type="email"
-                    placeholder="email@esempio.com"
-                    value={newGlobalAdminEmail}
-                    onChange={(e) => setNewGlobalAdminEmail(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") addGlobalAdminEmail(); }}
-                    style={{ flex: "1 1 260px" }}
-                  />
-                  <button type="button" className="btn green" onClick={addGlobalAdminEmail}>➕ Aggiungi Admin</button>
-                </div>
-              ) : (
-                <div className="global-validation-alert">🔒 Sei Global Admin, ma non Super Admin: puoi usare la Control Room, ma non puoi autorizzare altri account.</div>
-              )}
-              <div className="participants-table-wrap" style={{ marginTop: 12 }}>
-                <table className="participants-table global-users-table">
-                  <thead>
-                    <tr><th>Email autorizzata</th><th>Azione</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td data-label="Email autorizzata">{GLOBAL_CONTROL_ROOM_EMAIL} <strong>👑 Super Admin</strong></td>
-                      <td data-label="Azione"><span className="bonus-help">Protetta</span></td>
-                    </tr>
-                    {globalAdminsLoading && <tr><td colSpan="2">Caricamento...</td></tr>}
-                    {normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).map((adminEmail) => (
-                      <tr key={adminEmail}>
-                        <td data-label="Email autorizzata">{adminEmail}</td>
-                        <td data-label="Azione">{isControlRoomOwner ? <button type="button" className="btn danger" onClick={() => removeGlobalAdminEmail(adminEmail)}>❌ Rimuovi</button> : <span className="bonus-help">Solo lettura</span>}</td>
-                      </tr>
-                    ))}
-                    {!globalAdminsLoading && normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).length === 0 && (
-                      <tr><td colSpan="2">Nessun altro Global Admin autorizzato.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-              </>
-            ) : (
-              <div className="league-box owner-only-control-room-box">
-                <h2>🔐 Global Control Room Operativa</h2>
-                <p className="bonus-help">
-                  Accesso limitato: puoi gestire solo partite, risultati, pronostici e classifiche.
-                  Non puoi vedere utenti, email, leghe o autorizzare altri admin.
-                </p>
-              </div>
-            )
-            }
           />
-          </div>
+          </>
         )}
 
         <p>{message}</p>
@@ -3770,5 +3175,3 @@ isControlRoomOwner ? (
 }
 
 export default App;
-
-// Step21 - Global Control Room Dashboard + Super Admin only authorization
