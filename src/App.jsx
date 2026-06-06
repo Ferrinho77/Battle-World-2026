@@ -46,6 +46,8 @@ function App() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const [user, setPlayer] = useState(null);
   const [leagueName, setLeagueName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -1077,15 +1079,57 @@ function getPlayersInLeague() {
   }
 
   async function updatePassword() {
-    if (!currentPassword || !newPassword || !confirmPassword) { setMessage(t.fillPasswordFields); return; }
-    if (newPassword.length < 6) { setMessage(t.passwordMinLength); return; }
-    if (newPassword !== confirmPassword) { setMessage(t.passwordsDoNotMatch); return; }
-    const { error: loginError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword });
-    if (loginError) { setMessage(t.currentPasswordWrong); return; }
-    const { error } = await supabase.auth.updatePlayer({ password: newPassword });
-    if (error) { setMessage(error.message); return; }
-    setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
-    setMessage(`${t.passwordUpdated} ✅`);
+    setPasswordMessage("");
+    setMessage("");
+
+    if (!user?.email) {
+      setPasswordMessage("Sessione utente non valida. Effettua logout e login di nuovo.");
+      return;
+    }
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordMessage(t.fillPasswordFields || "Compila tutti i campi password.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordMessage(t.passwordMinLength || "La nuova password deve avere almeno 6 caratteri.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage(t.passwordsDoNotMatch || "Le password non coincidono.");
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+
+      if (loginError) {
+        setPasswordMessage(t.currentPasswordWrong || "La password attuale non è corretta.");
+        return;
+      }
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        setPasswordMessage(error.message || "Errore durante l'aggiornamento della password.");
+        return;
+      }
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordMessage(`${t.passwordUpdated || "Password aggiornata"} ✅`);
+    } catch (err) {
+      setPasswordMessage(err?.message || "Errore imprevisto durante l'aggiornamento della password.");
+    } finally {
+      setPasswordLoading(false);
+    }
   }
 
   async function loadLeagues(userId) {
@@ -2637,7 +2681,10 @@ function getPlayersInLeague() {
             <input type="password" placeholder={t.currentPassword} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
             <input type="password" placeholder={t.newPassword} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
             <input type="password" placeholder={t.confirmPassword} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-            <button className="btn blue" onClick={updatePassword}>{t.updatePassword}</button>
+            <button className="btn blue" onClick={updatePassword} disabled={passwordLoading}>
+              {passwordLoading ? (t.loading || "Aggiornamento...") : t.updatePassword}
+            </button>
+            {passwordMessage && <p className="form-message">{passwordMessage}</p>}
           </div>
         </>}
 
