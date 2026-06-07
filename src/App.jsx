@@ -46,8 +46,6 @@ function App() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [passwordMessage, setPasswordMessage] = useState("");
-  const [passwordLoading, setPasswordLoading] = useState(false);
   const [user, setPlayer] = useState(null);
   const [leagueName, setLeagueName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -86,6 +84,9 @@ function App() {
   const [globalAdminEmails, setGlobalAdminEmails] = useState([]);
   const [newGlobalAdminEmail, setNewGlobalAdminEmail] = useState("");
   const [globalAdminsLoading, setGlobalAdminsLoading] = useState(false);
+  const [knockoutOverrides, setKnockoutOverrides] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("knockoutOverrides") || "{}"); } catch { return {}; }
+  });
   const [isAdmin, setIsAdmin] = useState(false);
   const [predictions, setPredictions] = useState({});
   const [missingPredictionFields, setMissingPredictionFields] = useState({});
@@ -727,6 +728,25 @@ function getPlayersInLeague() {
     return `${date}T${hour}`;
   }
 
+  function saveKnockoutOverride(matchId, home, away) {
+    if (!home || !away) {
+      setMessage(t.selectBothTeams || "Seleziona entrambe le squadre prima di salvare.");
+      return;
+    }
+    const next = { ...knockoutOverrides, [matchId]: { home, away } };
+    setKnockoutOverrides(next);
+    localStorage.setItem("knockoutOverrides", JSON.stringify(next));
+    setMessage(t.saved || "Modifica salvata.");
+  }
+
+  function clearKnockoutOverride(matchId) {
+    const next = { ...knockoutOverrides };
+    delete next[matchId];
+    setKnockoutOverrides(next);
+    localStorage.setItem("knockoutOverrides", JSON.stringify(next));
+    setMessage(t.saved || "Modifica salvata.");
+  }
+
   function buildKnockoutMatches() {
     const prefixByRound = {
       Sedicesimi: "S",
@@ -789,6 +809,13 @@ function getPlayersInLeague() {
           home: resolveToken(homeRaw),
           away: resolveToken(awayRaw),
         };
+        item.autoHome = item.home;
+        item.autoAway = item.away;
+        const override = knockoutOverrides[item.id];
+        if (override) {
+          item.home = override.home || item.home;
+          item.away = override.away || item.away;
+        }
         codeMap[code] = item;
         list.push(item);
       });
@@ -1079,57 +1106,15 @@ function getPlayersInLeague() {
   }
 
   async function updatePassword() {
-    setPasswordMessage("");
-    setMessage("");
-
-    if (!user?.email) {
-      setPasswordMessage("Sessione utente non valida. Effettua logout e login di nuovo.");
-      return;
-    }
-
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordMessage(t.fillPasswordFields || "Compila tutti i campi password.");
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setPasswordMessage(t.passwordMinLength || "La nuova password deve avere almeno 6 caratteri.");
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setPasswordMessage(t.passwordsDoNotMatch || "Le password non coincidono.");
-      return;
-    }
-
-    setPasswordLoading(true);
-    try {
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
-      });
-
-      if (loginError) {
-        setPasswordMessage(t.currentPasswordWrong || "La password attuale non è corretta.");
-        return;
-      }
-
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-
-      if (error) {
-        setPasswordMessage(error.message || "Errore durante l'aggiornamento della password.");
-        return;
-      }
-
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setPasswordMessage(`${t.passwordUpdated || "Password aggiornata"} ✅`);
-    } catch (err) {
-      setPasswordMessage(err?.message || "Errore imprevisto durante l'aggiornamento della password.");
-    } finally {
-      setPasswordLoading(false);
-    }
+    if (!currentPassword || !newPassword || !confirmPassword) { setMessage(t.fillPasswordFields); return; }
+    if (newPassword.length < 6) { setMessage(t.passwordMinLength); return; }
+    if (newPassword !== confirmPassword) { setMessage(t.passwordsDoNotMatch); return; }
+    const { error: loginError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword });
+    if (loginError) { setMessage(t.currentPasswordWrong); return; }
+    const { error } = await supabase.auth.updatePlayer({ password: newPassword });
+    if (error) { setMessage(error.message); return; }
+    setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+    setMessage(`${t.passwordUpdated} ✅`);
   }
 
   async function loadLeagues(userId) {
@@ -1582,48 +1567,11 @@ function getPlayersInLeague() {
   }
 
   async function submitResetPassword() {
-    if (!resetNewPassword || !resetConfirmPassword) {
-      setMessage(t.fillPasswordFields || "Compila nuova password e conferma");
-      return;
-    }
-    if (resetNewPassword.length < 6) {
-      setMessage(t.passwordMinLength || "La nuova password deve avere almeno 6 caratteri");
-      return;
-    }
-    if (resetNewPassword !== resetConfirmPassword) {
-      setMessage(t.passwordsDoNotMatch || "Le nuove password non coincidono");
-      return;
-    }
-
-    // Supabase recovery link può arrivare come:
-    // /#access_token=...&refresh_token=...&type=recovery
-    // oppure /#reset-password#access_token=...&refresh_token=...&type=recovery
-    const fullHash = window.location.hash || "";
-    const tokenPart = fullHash.includes("access_token=")
-      ? fullHash.substring(fullHash.indexOf("access_token="))
-      : "";
-    const hashParams = new URLSearchParams(tokenPart);
-    const accessToken = hashParams.get("access_token");
-    const refreshToken = hashParams.get("refresh_token");
-    const recoveryType = hashParams.get("type");
-
-    if (recoveryType === "recovery" && accessToken && refreshToken) {
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-      if (sessionError) {
-        setMessage(sessionError.message || "Sessione reset password non valida. Richiedi una nuova email.");
-        return;
-      }
-    }
-
-    const { error } = await supabase.auth.updateUser({ password: resetNewPassword });
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
+    if (!resetNewPassword || !resetConfirmPassword) { setMessage(t.fillPasswordFields || "Compila nuova password e conferma"); return; }
+    if (resetNewPassword.length < 6) { setMessage(t.passwordMinLength || "La nuova password deve avere almeno 6 caratteri"); return; }
+    if (resetNewPassword !== resetConfirmPassword) { setMessage(t.passwordsDoNotMatch || "Le nuove password non coincidono"); return; }
+    const { error } = await supabase.auth.updatePlayer({ password: resetNewPassword });
+    if (error) { setMessage(error.message); return; }
     setResetNewPassword("");
     setResetConfirmPassword("");
     setResetMode(false);
@@ -2170,24 +2118,7 @@ function getPlayersInLeague() {
 
   function getSmartNotifications(knockoutMatches = [], nextDeadline = null) {
     const notifications = [];
-
-    // Non contare nei "pronostici mancanti" le partite della fase finale
-    // che non sono ancora realmente disponibili. Prima che le squadre siano
-    // determinate, i match KO contengono segnaposto tipo "1A", "Vincente S1",
-    // "Migliore 3ª", ecc. e non devono creare l'avviso "ti mancano 32 partite".
-    const isRealTeam = (team) => {
-      const value = String(team || "").trim();
-      if (!value) return false;
-      return allTeams.includes(value);
-    };
-
-    const isAvailablePredictionMatch = (match) => {
-      const isKnockout = String(match.id || "").startsWith("ko-");
-      if (!isKnockout) return true;
-      return isRealTeam(match.home) && isRealTeam(match.away);
-    };
-
-    const allPredictionMatches = [...matches, ...knockoutMatches].filter(isAvailablePredictionMatch);
+    const allPredictionMatches = [...matches, ...knockoutMatches];
 
     const editableMatches = allPredictionMatches.filter((match) => !isPredictionLocked(match));
     const missingMatches = editableMatches.filter((match) => {
@@ -2718,10 +2649,7 @@ function getPlayersInLeague() {
             <input type="password" placeholder={t.currentPassword} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
             <input type="password" placeholder={t.newPassword} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
             <input type="password" placeholder={t.confirmPassword} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-            <button className="btn blue" onClick={updatePassword} disabled={passwordLoading}>
-              {passwordLoading ? (t.loading || "Aggiornamento...") : t.updatePassword}
-            </button>
-            {passwordMessage && <p className="form-message">{passwordMessage}</p>}
+            <button className="btn blue" onClick={updatePassword}>{t.updatePassword}</button>
           </div>
         </>}
 
@@ -3101,48 +3029,6 @@ function getPlayersInLeague() {
 
         {activeTab === "admin" && isGlobalControlRoomAdmin && (
           <>
-            <div className="league-box owner-only-control-room-box">
-              <h2>🌍 Global Control Room Admins</h2>
-              <p className="bonus-help">
-                Autorizza email globalmente alla Control Room. Questi utenti potranno entrare anche se non sono membri di nessuna lega.
-              </p>
-              <div className="admin-email-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <input
-                  type="email"
-                  placeholder="email@esempio.com"
-                  value={newGlobalAdminEmail}
-                  onChange={(e) => setNewGlobalAdminEmail(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") addGlobalAdminEmail(); }}
-                  style={{ flex: "1 1 260px" }}
-                />
-                <button type="button" className="btn green" onClick={addGlobalAdminEmail}>➕ Aggiungi Admin</button>
-                <button type="button" className="btn blue" onClick={loadAuthorizedAdmins}>🔄 Aggiorna</button>
-              </div>
-              <div className="participants-table-wrap" style={{ marginTop: 12 }}>
-                <table className="participants-table">
-                  <thead>
-                    <tr><th>Email autorizzata</th><th>Azione</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>{GLOBAL_CONTROL_ROOM_EMAIL} <strong>👑 Owner</strong></td>
-                      <td><span className="bonus-help">Protetta</span></td>
-                    </tr>
-                    {globalAdminsLoading && <tr><td colSpan="2">Caricamento...</td></tr>}
-                    {normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).map((adminEmail) => (
-                      <tr key={adminEmail}>
-                        <td>{adminEmail}</td>
-                        <td><button type="button" className="btn danger" onClick={() => removeGlobalAdminEmail(adminEmail)}>❌ Rimuovi</button></td>
-                      </tr>
-                    ))}
-                    {!globalAdminsLoading && normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).length === 0 && (
-                      <tr><td colSpan="2">Nessun altro Global Admin autorizzato.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
             <AdminPanel
             t={t}
             users={users}
@@ -3166,6 +3052,32 @@ function getPlayersInLeague() {
             finalTopScorer={finalTopScorer}
             setFinalTopScorer={setFinalTopScorer}
             saveFinalTopScorer={saveFinalTopScorer}
+            allTeams={allTeams}
+            knockoutMatches={knockoutMatches}
+            knockoutOverrides={knockoutOverrides}
+            saveKnockoutOverride={saveKnockoutOverride}
+            clearKnockoutOverride={clearKnockoutOverride}
+            adminContent={(
+              <div className="league-box owner-only-control-room-box">
+                <h2>🌍 Global Control Room Admins</h2>
+                <p className="bonus-help">Autorizza email globalmente alla Control Room. Questi utenti potranno entrare anche se non sono membri di nessuna lega.</p>
+                <div className="admin-email-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input type="email" placeholder="email@esempio.com" value={newGlobalAdminEmail} onChange={(e) => setNewGlobalAdminEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addGlobalAdminEmail(); }} style={{ flex: "1 1 260px" }} />
+                  <button type="button" className="btn green" onClick={addGlobalAdminEmail}>➕ Aggiungi Admin</button>
+                  <button type="button" className="btn blue" onClick={loadAuthorizedAdmins}>🔄 Aggiorna</button>
+                </div>
+                <div className="participants-table-wrap" style={{ marginTop: 12 }}>
+                  <table className="participants-table"><thead><tr><th>Email autorizzata</th><th>Azione</th></tr></thead><tbody>
+                    <tr><td>{GLOBAL_CONTROL_ROOM_EMAIL} <strong>👑 Owner</strong></td><td><span className="bonus-help">Protetta</span></td></tr>
+                    {globalAdminsLoading && <tr><td colSpan="2">Caricamento...</td></tr>}
+                    {normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).map((adminEmail) => (
+                      <tr key={adminEmail}><td>{adminEmail}</td><td><button type="button" className="btn danger" onClick={() => removeGlobalAdminEmail(adminEmail)}>❌ Rimuovi</button></td></tr>
+                    ))}
+                    {!globalAdminsLoading && normalizedGlobalAdminEmails.filter((email) => email !== GLOBAL_CONTROL_ROOM_EMAIL).length === 0 && <tr><td colSpan="2">Nessun altro Global Admin autorizzato.</td></tr>}
+                  </tbody></table>
+                </div>
+              </div>
+            )}
           />
           </>
         )}

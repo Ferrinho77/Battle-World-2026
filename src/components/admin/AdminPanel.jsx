@@ -32,6 +32,7 @@ export default function AdminPanel({
   predictionLockControlLoading = false,
   updatePredictionLockControl,
   userAdminContent,
+  adminContent,
 }) {
   const [activeAdminTab, setActiveAdminTab] = useState("dashboard");
 
@@ -130,8 +131,8 @@ export default function AdminPanel({
     { id: "results", label: `⚽ ${t.results || "Risultati"}` },
     { id: "qualifications", label: `🏆 ${t.qualifications || "Qualificazioni"}` },
     { id: "predictions", label: `🎯 ${t.predictions || "Pronostici"}` },
-    { id: "users", label: `👥 ${t.userAdmin || "Utenti / Admin"}` },
     { id: "system", label: `⚙️ ${t.system || "Sistema"}` },
+    { id: "admin", label: `🔐 ${t.admin || "Admin"}` },
   ];
 
   const teamOptions = Array.from(new Set([...(allTeams || []), ...(knockoutMatches || []).flatMap((m) => [m.home, m.away, m.autoHome, m.autoAway])].filter(Boolean)));
@@ -157,6 +158,17 @@ export default function AdminPanel({
             <div className="admin-stat-card"><span>🏆 {t.usersUpper || "UTENTI"}</span><strong>{users.length}</strong></div>
           </div>
           <div className="league-box"><h3>📊 {t.controlRoomDashboard || "Dashboard Control Room"}</h3><p className="bonus-help">{t.controlRoomDashboardHelp || "Usa le sottopagine per gestire risultati, qualificazioni e sistema."}</p></div>
+        </>
+      )}
+
+      {activeAdminTab === "admin" && (
+        <>
+          {adminContent || (
+            <div className="league-box">
+              <h3>🔐 {t.admin || "Admin"}</h3>
+              <p>Gestione admin non disponibile.</p>
+            </div>
+          )}
         </>
       )}
 
@@ -293,17 +305,6 @@ export default function AdminPanel({
             {t.predictionLockModesExplanation || "AUTO = segue date e impostazioni lega. FORCE_LOCKED = blocca ogni pronostico. FORCE_UNLOCKED = sblocca temporaneamente. TEST_STARTED = simula l'inizio torneo per testare Qualificate, Piazzamenti Gruppi e Golden Boot."}
           </p>
         </div>
-      )}
-
-      {activeAdminTab === "users" && (
-        <>
-          {userAdminContent || (
-            <div className="league-box">
-              <h3>👥 {t.userAdmin || "Utenti / Admin"}</h3>
-              <p className="bonus-help">{t.userAdminUnavailable || "Gestione utenti e autorizzazioni admin non disponibile."}</p>
-            </div>
-          )}
-        </>
       )}
 
       {activeAdminTab === "system" && (
