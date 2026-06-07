@@ -84,6 +84,8 @@ function App() {
   const [globalAdminEmails, setGlobalAdminEmails] = useState([]);
   const [newGlobalAdminEmail, setNewGlobalAdminEmail] = useState("");
   const [globalAdminsLoading, setGlobalAdminsLoading] = useState(false);
+  const [predictionLockModeControl, setPredictionLockModeControl] = useState(() => localStorage.getItem("predictionLockModeControl") || "AUTO");
+  const [predictionLockControlLoading, setPredictionLockControlLoading] = useState(false);
   const [knockoutOverrides, setKnockoutOverrides] = useState(() => {
     try { return JSON.parse(localStorage.getItem("knockoutOverrides") || "{}"); } catch { return {}; }
   });
@@ -444,6 +446,19 @@ function App() {
     return dates[0] || null;
   }
 
+  async function updatePredictionLockControl(mode) {
+    const allowedModes = ["AUTO", "FORCE_LOCKED", "FORCE_UNLOCKED", "TEST_STARTED"];
+    if (!allowedModes.includes(mode)) return;
+    setPredictionLockControlLoading(true);
+    try {
+      localStorage.setItem("predictionLockModeControl", mode);
+      setPredictionLockModeControl(mode);
+      setMessage(`Blocco pronostici aggiornato: ${mode} ✅`);
+    } finally {
+      setPredictionLockControlLoading(false);
+    }
+  }
+
   function getPredictionLockDate(match) {
     if (leagueSettings.prediction_lock_mode === "tournament") return getTournamentStartDate();
     if (leagueSettings.prediction_lock_mode === "stage" || leagueSettings.prediction_lock_mode === "stage_round") {
@@ -480,6 +495,8 @@ function getPredictionLockText(match) {
   }
 
   function isPredictionLocked(match) {
+    if (predictionLockModeControl === "FORCE_UNLOCKED") return false;
+    if (predictionLockModeControl === "FORCE_LOCKED" || predictionLockModeControl === "TEST_STARTED") return true;
     const lockDate = getPredictionLockDate(match);
     if (!lockDate) return false;
     return new Date() >= new Date(lockDate);
@@ -533,6 +550,8 @@ function getPredictionLockText(match) {
   }
 
   function isTournamentStarted() {
+    if (predictionLockModeControl === "FORCE_UNLOCKED") return false;
+    if (predictionLockModeControl === "FORCE_LOCKED" || predictionLockModeControl === "TEST_STARTED") return true;
     const start = getTournamentStartDate();
     return !!start && new Date() >= start;
   }
@@ -1111,7 +1130,7 @@ function getPlayersInLeague() {
     if (newPassword !== confirmPassword) { setMessage(t.passwordsDoNotMatch); return; }
     const { error: loginError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword });
     if (loginError) { setMessage(t.currentPasswordWrong); return; }
-    const { error } = await supabase.auth.updatePlayer({ password: newPassword });
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) { setMessage(error.message); return; }
     setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
     setMessage(`${t.passwordUpdated} ✅`);
@@ -1567,11 +1586,45 @@ function getPlayersInLeague() {
   }
 
   async function submitResetPassword() {
-    if (!resetNewPassword || !resetConfirmPassword) { setMessage(t.fillPasswordFields || "Compila nuova password e conferma"); return; }
-    if (resetNewPassword.length < 6) { setMessage(t.passwordMinLength || "La nuova password deve avere almeno 6 caratteri"); return; }
-    if (resetNewPassword !== resetConfirmPassword) { setMessage(t.passwordsDoNotMatch || "Le nuove password non coincidono"); return; }
-    const { error } = await supabase.auth.updatePlayer({ password: resetNewPassword });
-    if (error) { setMessage(error.message); return; }
+    if (!resetNewPassword || !resetConfirmPassword) {
+      setMessage(t.fillPasswordFields || "Compila nuova password e conferma");
+      return;
+    }
+    if (resetNewPassword.length < 6) {
+      setMessage(t.passwordMinLength || "La nuova password deve avere almeno 6 caratteri");
+      return;
+    }
+    if (resetNewPassword !== resetConfirmPassword) {
+      setMessage(t.passwordsDoNotMatch || "Le nuove password non coincidono");
+      return;
+    }
+
+    const fullHash = window.location.hash || "";
+    const tokenPart = fullHash.includes("access_token=")
+      ? fullHash.substring(fullHash.indexOf("access_token="))
+      : "";
+    const hashParams = new URLSearchParams(tokenPart);
+    const accessToken = hashParams.get("access_token");
+    const refreshToken = hashParams.get("refresh_token");
+    const recoveryType = hashParams.get("type");
+
+    if (recoveryType === "recovery" && accessToken && refreshToken) {
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (sessionError) {
+        setMessage(sessionError.message || "Sessione reset password non valida. Richiedi una nuova email.");
+        return;
+      }
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: resetNewPassword });
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
     setResetNewPassword("");
     setResetConfirmPassword("");
     setResetMode(false);
@@ -2116,11 +2169,30 @@ function getPlayersInLeague() {
     };
   }
 
+
+  function isRealPredictionTeam(value) {
+    const text = String(value || "").trim();
+    if (!text) return false;
+    const lower = text.toLowerCase();
+    if (lower.includes("vincente") || lower.includes("perdente") || lower.includes("migliore 3")) return false;
+    if (/^[12][a-l]$/i.test(text)) return false;
+    return true;
+  }
+
+  function isAvailablePredictionMatch(match) {
+    const isKnockout = String(match?.id || "").startsWith("ko-");
+    if (!isKnockout) return true;
+    return isRealPredictionTeam(match.home) && isRealPredictionTeam(match.away);
+  }
+
   function getSmartNotifications(knockoutMatches = [], nextDeadline = null) {
     const notifications = [];
     const allPredictionMatches = [...matches, ...knockoutMatches];
 
-    const editableMatches = allPredictionMatches.filter((match) => !isPredictionLocked(match));
+    const editableMatches = allPredictionMatches
+      .filter(isAvailablePredictionMatch)
+      .filter((match) => !isPredictionLocked(match));
+
     const missingMatches = editableMatches.filter((match) => {
       const p = predictions[match.id] || {};
       return p.home_score === undefined || p.home_score === "" || p.away_score === undefined || p.away_score === "";
@@ -2135,7 +2207,7 @@ function getPlayersInLeague() {
       });
     }
 
-    if (!selectedTopScorer) {
+    if (!isTournamentStarted() && !selectedTopScorer) {
       notifications.push({
         type: "warning",
         icon: "🥾",
@@ -2144,7 +2216,7 @@ function getPlayersInLeague() {
       });
     }
 
-    if (leagueSettings.enable_qualification_bonus) {
+    if (!isTournamentStarted() && leagueSettings.enable_qualification_bonus) {
       const expected = qualificationRounds.reduce((sum, round) => sum + round.count, 0) + 1;
       const completed = qualificationRounds.reduce((sum, round) => {
         const value = getBonusValue("qualification", round.key);
@@ -2161,7 +2233,7 @@ function getPlayersInLeague() {
       }
     }
 
-    if (leagueSettings.enable_group_positions_bonus) {
+    if (!isTournamentStarted() && leagueSettings.enable_group_positions_bonus) {
       const expected = groups.length * 4;
       const completed = groups.reduce((sum, group) => {
         const value = getBonusValue("group_position", group.name);
@@ -2178,7 +2250,7 @@ function getPlayersInLeague() {
       }
     }
 
-    if (nextDeadline?.date) {
+    if (nextDeadline?.date && predictionLockModeControl === "AUTO") {
       const diffMs = new Date(nextDeadline.date).getTime() - Date.now();
       if (!Number.isNaN(diffMs)) {
         if (diffMs <= 0) {
@@ -2197,6 +2269,15 @@ function getPlayersInLeague() {
           });
         }
       }
+    }
+
+    if (predictionLockModeControl === "FORCE_LOCKED" || predictionLockModeControl === "TEST_STARTED") {
+      notifications.push({
+        type: "danger",
+        icon: "🔒",
+        text: t.predictionsLockedTournamentStarted || "Pronostici bloccati",
+        tab: "partite",
+      });
     }
 
     return notifications;
@@ -3057,6 +3138,9 @@ function getPlayersInLeague() {
             knockoutOverrides={knockoutOverrides}
             saveKnockoutOverride={saveKnockoutOverride}
             clearKnockoutOverride={clearKnockoutOverride}
+            predictionLockModeControl={predictionLockModeControl}
+            predictionLockControlLoading={predictionLockControlLoading}
+            updatePredictionLockControl={updatePredictionLockControl}
             adminContent={(
               <div className="league-box owner-only-control-room-box">
                 <h2>🌍 Global Control Room Admins</h2>
