@@ -1585,7 +1585,7 @@ function getPlayersInLeague() {
     if (!resetNewPassword || !resetConfirmPassword) { setMessage(t.fillPasswordFields || "Compila nuova password e conferma"); return; }
     if (resetNewPassword.length < 6) { setMessage(t.passwordMinLength || "La nuova password deve avere almeno 6 caratteri"); return; }
     if (resetNewPassword !== resetConfirmPassword) { setMessage(t.passwordsDoNotMatch || "Le nuove password non coincidono"); return; }
-    const { error } = await supabase.auth.updatePlayer({ password: resetNewPassword });
+    const { error } = await supabase.auth.updateUser({ password: resetNewPassword });
     if (error) { setMessage(error.message); return; }
     setResetNewPassword("");
     setResetConfirmPassword("");
