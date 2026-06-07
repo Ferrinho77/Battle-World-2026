@@ -1582,11 +1582,48 @@ function getPlayersInLeague() {
   }
 
   async function submitResetPassword() {
-    if (!resetNewPassword || !resetConfirmPassword) { setMessage(t.fillPasswordFields || "Compila nuova password e conferma"); return; }
-    if (resetNewPassword.length < 6) { setMessage(t.passwordMinLength || "La nuova password deve avere almeno 6 caratteri"); return; }
-    if (resetNewPassword !== resetConfirmPassword) { setMessage(t.passwordsDoNotMatch || "Le nuove password non coincidono"); return; }
-    const { error } = await supabase.auth.updatePlayer({ password: resetNewPassword });
-    if (error) { setMessage(error.message); return; }
+    if (!resetNewPassword || !resetConfirmPassword) {
+      setMessage(t.fillPasswordFields || "Compila nuova password e conferma");
+      return;
+    }
+    if (resetNewPassword.length < 6) {
+      setMessage(t.passwordMinLength || "La nuova password deve avere almeno 6 caratteri");
+      return;
+    }
+    if (resetNewPassword !== resetConfirmPassword) {
+      setMessage(t.passwordsDoNotMatch || "Le nuove password non coincidono");
+      return;
+    }
+
+    // Supabase recovery link può arrivare come:
+    // /#access_token=...&refresh_token=...&type=recovery
+    // oppure /#reset-password#access_token=...&refresh_token=...&type=recovery
+    const fullHash = window.location.hash || "";
+    const tokenPart = fullHash.includes("access_token=")
+      ? fullHash.substring(fullHash.indexOf("access_token="))
+      : "";
+    const hashParams = new URLSearchParams(tokenPart);
+    const accessToken = hashParams.get("access_token");
+    const refreshToken = hashParams.get("refresh_token");
+    const recoveryType = hashParams.get("type");
+
+    if (recoveryType === "recovery" && accessToken && refreshToken) {
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (sessionError) {
+        setMessage(sessionError.message || "Sessione reset password non valida. Richiedi una nuova email.");
+        return;
+      }
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: resetNewPassword });
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
     setResetNewPassword("");
     setResetConfirmPassword("");
     setResetMode(false);
