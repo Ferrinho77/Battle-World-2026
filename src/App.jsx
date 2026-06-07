@@ -1585,6 +1585,19 @@ function getPlayersInLeague() {
     if (!resetNewPassword || !resetConfirmPassword) { setMessage(t.fillPasswordFields || "Compila nuova password e conferma"); return; }
     if (resetNewPassword.length < 6) { setMessage(t.passwordMinLength || "La nuova password deve avere almeno 6 caratteri"); return; }
     if (resetNewPassword !== resetConfirmPassword) { setMessage(t.passwordsDoNotMatch || "Le nuove password non coincidono"); return; }
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get("access_token");
+    const refreshToken = hashParams.get("refresh_token");
+    const type = hashParams.get("type");
+
+    if (type === "recovery" && accessToken && refreshToken) {
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (sessionError) { setMessage(sessionError.message); return; }
+    }
+
     const { error } = await supabase.auth.updateUser({ password: resetNewPassword });
     if (error) { setMessage(error.message); return; }
     setResetNewPassword("");
