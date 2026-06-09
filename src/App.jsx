@@ -1873,20 +1873,61 @@ function getPlayersInLeague() {
   }
 
   async function saveAllPredictions(matchList = matches) {
-    validateMatchPredictions(matchList);
-    const rows = matchList.filter((match) => {
-      const p = predictions[match.id];
-      return p && p.home_score !== undefined && p.home_score !== "" && p.away_score !== undefined && p.away_score !== "" && !isPredictionLocked(match);
-    }).map((match) => {
-      const p = predictions[match.id];
-      return { user_id: user.id, username: username || user.email.split("@")[0], user_email: user.email, league_id: selectedLeague.id, match_id: match.id, home_score: Number(p.home_score), away_score: Number(p.away_score), points: 0 };
-    });
-    if (rows.length === 0) { setMessage(t.enterAtLeastOnePrediction); return; }
-    console.log("ROWS", rows);
-    const { error } = await supabase.from("predictions").upsert(rows, { onConflict: "user_id,league_id,match_id" });
-    if (error) { setMessage(error.message); return; }
-    loadPredictions(user.id, selectedLeague.id); loadAllPredictions(selectedLeague.id); setMessage(`${t.predictionsSaved} ✅`);
+  validateMatchPredictions(matchList);
+
+  if (!user?.id || !selectedLeague?.id || selectedLeague?.__global) {
+    setMessage("Errore: utente o lega non disponibile.");
+    return;
   }
+
+  const rows = matchList
+    .filter((match) => {
+      const p = predictions[match.id];
+      return (
+        p &&
+        p.home_score !== undefined &&
+        p.home_score !== "" &&
+        p.away_score !== undefined &&
+        p.away_score !== "" &&
+        !isPredictionLocked(match)
+      );
+    })
+    .map((match) => {
+      const p = predictions[match.id];
+      return {
+        user_id: user.id,
+        username: username || user.email.split("@")[0],
+        user_email: user.email,
+        league_id: selectedLeague.id,
+        match_id: match.id,
+        home_score: Number(p.home_score),
+        away_score: Number(p.away_score),
+        points: 0
+      };
+    });
+
+  console.log("ROWS DA SALVARE", rows);
+
+  if (rows.length === 0) {
+    setMessage(t.enterAtLeastOnePrediction);
+    return;
+  }
+
+  const { error } = await supabase
+    .from("predictions")
+    .upsert(rows, { onConflict: "user_id,league_id,match_id" });
+
+  if (error) {
+    console.error("ERRORE SALVATAGGIO PRONOSTICI", error);
+    setMessage(`Errore salvataggio: ${error.message}`);
+    return;
+  }
+
+  await loadPredictions(user.id, selectedLeague.id);
+  await loadAllPredictions(selectedLeague.id);
+
+  setMessage(`${t.predictionsSaved} ✅`);
+}
 
 
   async function saveBonusPredictions() {
