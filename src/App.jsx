@@ -1706,14 +1706,21 @@ function getPlayersInLeague() {
     return Number.isNaN(n) ? "" : n;
   }
 
-  function updatePrediction(matchId, field, value) {
-    setPredictions({ ...predictions, [matchId]: { ...predictions[matchId], [field]: normalizeScoreInput(value) } });
-    setMissingPredictionFields((prev) => {
-      const next = { ...prev };
-      delete next[`${matchId}::${field}`];
-      return next;
-    });
-  }
+function updatePrediction(matchId, field, value) {
+  setPredictions((prev) => ({
+    ...prev,
+    [matchId]: {
+      ...(prev[matchId] || {}),
+      [field]: normalizeScoreInput(value)
+    }
+  }));
+
+  setMissingPredictionFields((prev) => {
+    const next = { ...prev };
+    delete next[`${matchId}::${field}`];
+    return next;
+  });
+}
 
   function showValidationMessage(text) {
     setMessage(text);
@@ -1933,7 +1940,9 @@ function getPlayersInLeague() {
   async function saveBonusPredictions() {
     if (isTournamentStarted()) { setMessage(`${t.predictionsLockedTournamentStarted} 🔒`); return; }
     if (!selectedLeague?.id || selectedLeague?.__global || !user?.id) return;
-    if ((activeTab === "passaggio-turno" || activeTab === "piazzamento-gironi") && !validateBonusPredictions()) return;
+    if (activeTab === "passaggio-turno" || activeTab === "piazzamento-gironi") {
+  validateBonusPredictions();
+}
     const rows = [];
     Object.entries(bonusPredictions).forEach(([compoundKey, value]) => {
       const [prediction_type, prediction_key] = compoundKey.split("::");
