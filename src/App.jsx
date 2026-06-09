@@ -1882,6 +1882,7 @@ function getPlayersInLeague() {
       return { user_id: user.id, username: username || user.email.split("@")[0], user_email: user.email, league_id: selectedLeague.id, match_id: match.id, home_score: Number(p.home_score), away_score: Number(p.away_score), points: 0 };
     });
     if (rows.length === 0) { setMessage(t.enterAtLeastOnePrediction); return; }
+    console.log("ROWS", rows);
     const { error } = await supabase.from("predictions").upsert(rows, { onConflict: "user_id,league_id,match_id" });
     if (error) { setMessage(error.message); return; }
     loadPredictions(user.id, selectedLeague.id); loadAllPredictions(selectedLeague.id); setMessage(`${t.predictionsSaved} ✅`);
