@@ -1873,7 +1873,7 @@ function getPlayersInLeague() {
   }
 
   async function saveAllPredictions(matchList = matches) {
-    if (!validateMatchPredictions(matchList)) return;
+    validateMatchPredictions(matchList);
     const rows = matchList.filter((match) => {
       const p = predictions[match.id];
       return p && p.home_score !== undefined && p.home_score !== "" && p.away_score !== undefined && p.away_score !== "" && !isPredictionLocked(match);
