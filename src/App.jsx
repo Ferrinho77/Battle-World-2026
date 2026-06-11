@@ -1509,24 +1509,50 @@ function getPlayersInLeague() {
     setMatchEvents(formatted);
   }
 
-  async function saveRealResult(matchId, home, away, finished = true) {
-    if (home === "" || away === "") { setMessage(t.enterRealResult); return; }
-    const homeScore = Number(home);
-    const awayScore = Number(away);
-    if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0 || homeScore > 20 || awayScore > 20) {
-      setMessage(t.enterRealResult);
-      return;
-    }
-    const { error } = await supabase.from("real_results").upsert({ match_id: matchId, home_score: homeScore, away_score: awayScore, finished });
-    if (error) { setMessage(error.message); return; }
-    await loadRealResults();
-    await loadMatchEvents(true);
-    if (selectedLeague?.id && !selectedLeague?.__global) {
-      await loadAllPredictions(selectedLeague.id);
-      await loadAllBonusPredictions(selectedLeague.id);
-      await loadAllTopScorerPredictions(selectedLeague.id);
-    }
-    setMessage(finished ? `${t.resultConfirmed} ✅` : `${t.liveResultSaved} 🔵`);
+async function saveRealResult(matchId, home, away, finished = true, qualifiedTeam = null, winType = null, minute = "") {
+  if (home === "" || away === "") { setMessage(t.enterRealResult); return; }
+
+  const homeScore = Number(home);
+  const awayScore = Number(away);
+  const liveMinute = minute === "" ? null : Number(minute);
+
+  if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0 || homeScore > 20 || awayScore > 20) {
+    setMessage(t.enterRealResult);
+    return;
+  }
+
+  if (liveMinute !== null && (!Number.isInteger(liveMinute) || liveMinute < 0 || liveMinute > 130)) {
+    setMessage("Minuto live non valido");
+    return;
+  }
+
+  const payload = {
+    match_id: matchId,
+    home_score: homeScore,
+    away_score: awayScore,
+    finished,
+    status: finished ? "FINAL" : "LIVE",
+    minute: finished ? null : liveMinute,
+    qualified_team: qualifiedTeam || null,
+    win_type: winType || null
+  };
+
+  const { error } = await supabase
+    .from("real_results")
+    .upsert(payload, { onConflict: "match_id" });
+
+  if (error) { setMessage(error.message); return; }
+
+  await loadRealResults();
+  await loadMatchEvents(true);
+
+  if (selectedLeague?.id && !selectedLeague?.__global) {
+    await loadAllPredictions(selectedLeague.id);
+    await loadAllBonusPredictions(selectedLeague.id);
+    await loadAllTopScorerPredictions(selectedLeague.id);
+  }
+
+  setMessage(finished ? `${t.resultConfirmed} ✅` : `${t.liveResultSaved} 🔵`);
   }
 
   async function recalculateLeagueData() {

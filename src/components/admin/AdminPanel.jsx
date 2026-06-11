@@ -70,24 +70,39 @@ export default function AdminPanel({
   };
 
   const saveAdminMatchResult = (match, finished) => {
-    const home = getInputValue(`rh-${match.id}`);
-    const away = getInputValue(`ra-${match.id}`);
+  const home = getInputValue(`rh-${match.id}`);
+  const away = getInputValue(`ra-${match.id}`);
+  const minute = getInputValue(`rm-${match.id}`);
 
-    if (!isKnockoutMatch(match)) {
-      saveRealResult(match.id, home, away, finished);
-      return;
-    }
+  if (!isKnockoutMatch(match)) {
+    saveRealResult(match.id, home, away, finished, null, null, minute);
+    return;
+  }
 
-    const qualifiedTeam = finished ? getKnockoutQualifiedValue(match) : (getInputValue(`rq-${match.id}`) || "");
-    const winType = getKnockoutWinType(match);
+  const qualifiedTeam = finished
+    ? getKnockoutQualifiedValue(match)
+    : (getInputValue(`rq-${match.id}`) || "");
 
-    if (finished && !qualifiedTeam) {
-      alert(t.selectQualifiedTeamBeforeConfirm || "Seleziona la squadra qualificata prima di confermare il risultato finale.");
-      return;
-    }
+  const winType = getKnockoutWinType(match);
 
-    saveRealResult(match.id, home, away, finished, qualifiedTeam, winType);
-  };
+  if (finished && !qualifiedTeam) {
+    alert(
+      t.selectQualifiedTeamBeforeConfirm ||
+      "Seleziona la squadra qualificata prima di confermare il risultato finale."
+    );
+    return;
+  }
+
+  saveRealResult(
+    match.id,
+    home,
+    away,
+    finished,
+    qualifiedTeam,
+    winType,
+    minute
+  );
+};
 
   const adminDisplayMatches = [...allDisplayMatches]
     .sort((a, b) => {
@@ -206,11 +221,12 @@ export default function AdminPanel({
                       <div className="admin-match-head"><span>{statusLabel}</span><small>📅 {formatMatchDateTime(match)}</small></div>
                       <strong>{trTeamLabel(match.home)} - {trTeamLabel(match.away)}</strong>
                       {renderRealResult(match.id)}
-                      {isKnockoutMatch(match) && <p className="bonus-help" style={{ marginTop: 8 }}>{t.knockoutResultAdminHelp || "Risultato dopo i 90 minuti per i pronostici. La squadra qualificata serve per tabellone e bonus passaggio turno."}</p>}
+       {isKnockoutMatch(match) && <p className="bonus-help" style={{ marginTop: 8 }}>{t.knockoutResultAdminHelp || "Risultato dopo i 90 minuti per i pronostici. La squadra qualificata serve per tabellone e bonus passaggio turno."}</p>}
                       <div className="score-row">
-                        <input id={`rh-${match.id}`} type="number" min="0" max="20" placeholder={isKnockoutMatch(match) ? `${t.home} 90'` : t.home} defaultValue={result?.home_score ?? ""} disabled={isFinal} />
-                        <input id={`ra-${match.id}`} type="number" min="0" max="20" placeholder={isKnockoutMatch(match) ? `${t.away} 90'` : t.away} defaultValue={result?.away_score ?? ""} disabled={isFinal} />
-                      </div>
+  <input id={`rh-${match.id}`} type="number" min="0" max="20" placeholder={isKnockoutMatch(match) ? `${t.home} 90'` : t.home} defaultValue={result?.home_score ?? ""} disabled={isFinal} />
+  <input id={`ra-${match.id}`} type="number" min="0" max="20" placeholder={isKnockoutMatch(match) ? `${t.away} 90'` : t.away} defaultValue={result?.away_score ?? ""} disabled={isFinal} />
+  <input id={`rm-${match.id}`} type="number" min="0" max="130" placeholder="Min." defaultValue={result?.minute ?? ""} disabled={isFinal} />
+</div>
                       {isKnockoutMatch(match) && (
                         <div className="score-row">
                           <select id={`rq-${match.id}`} defaultValue={result?.qualified_team || ""} disabled={isFinal}>
