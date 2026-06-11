@@ -714,15 +714,27 @@ function getPlayersInLeague() {
     return Number(leagueSettings.exact_hard_points || 0);
   }
 
-  function calculatePoints(prediction, real) {
-    if (!real) return 0;
-    const ph = Number(prediction.home_score), pa = Number(prediction.away_score);
-    const rh = Number(real.home_score), ra = Number(real.away_score);
-    if (ph === rh && pa === ra) return getExactScorePoints(rh, ra);
-    const predWinner = ph > pa ? "H" : ph < pa ? "A" : "D";
-    const realWinner = rh > ra ? "H" : rh < ra ? "A" : "D";
-    return predWinner === realWinner ? Number(leagueSettings.outcome_points || 0) : 0;
+ function calculatePoints(prediction, real) {
+  if (!real) return 0;
+
+  const ph = Number(prediction.home_score), pa = Number(prediction.away_score);
+  const rh = Number(real.home_score), ra = Number(real.away_score);
+
+  const predWinner = ph > pa ? "H" : ph < pa ? "A" : "D";
+  const realWinner = rh > ra ? "H" : rh < ra ? "A" : "D";
+
+  let points = 0;
+
+  if (ph === rh && pa === ra) {
+    points += getExactScorePoints(rh, ra);
   }
+
+  if (predWinner === realWinner) {
+    points += Number(leagueSettings.outcome_points || 0);
+  }
+
+  return points;
+}
 
 
   function getFinishedCountForGroup(groupName) {
