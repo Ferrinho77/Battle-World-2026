@@ -234,37 +234,54 @@ function App() {
     return <p style={{ color: "#f5a524", fontWeight: "bold" }}>🟡 {t.pending}</p>;
   }
 
-  function renderRealResult(matchId, compact = false) {
-    const result = realResults[matchId];
-    if (!result) return compact ? null : <p style={{ color: "#9fb1c8" }}>{t.realResult}: -</p>;
-    const label = result.finished ? t.finalResult : t.liveResult;
-    const status = result.finished ? `✅ ${t.confirmed}` : `🔵 ${t.live}`;
-    const content = `${label}: ${result.home_score} - ${result.away_score} ${status}`;
-    return compact
-      ? <small style={{ display: "block", color: result.finished ? "#18c964" : "#58a6ff", marginTop: 4 }}>{content}</small>
-      : <p style={{ color: result.finished ? "#18c964" : "#58a6ff", fontWeight: "bold" }}>{content}</p>;
+ function getLiveMinute(result) {
+  if (!result || result.finished || result.minute === null || result.minute === undefined) return null;
+  if (!result.live_updated_at) return result.minute;
+
+  const updatedAt = new Date(result.live_updated_at).getTime();
+  const diffMinutes = Math.floor((Date.now() - updatedAt) / 60000);
+
+  return Math.min(130, Number(result.minute) + Math.max(0, diffMinutes));
+}
+
+function renderRealResult(matchId, compact = false) {
+  const result = realResults[matchId];
+  if (!result) return compact ? null : <p style={{ color: "#9fb1c8" }}>{t.realResult}: -</p>;
+
+  const liveMinute = getLiveMinute(result);
+  const label = result.finished ? t.finalResult : t.liveResult;
+  const status = result.finished ? `✅ ${t.confirmed}` : `🔴 ${liveMinute !== null ? `${liveMinute}'` : t.live}`;
+  const content = `${label}: ${result.home_score} - ${result.away_score} ${status}`;
+
+  return compact
+    ? <small style={{ display: "block", color: result.finished ? "#18c964" : "#58a6ff", marginTop: 4 }}>{content}</small>
+    : <p style={{ color: result.finished ? "#18c964" : "#58a6ff", fontWeight: "bold" }}>{content}</p>;
+}
+
+function renderPlayersRealResultCell(matchId) {
+  const result = realResults[matchId];
+  if (!result) {
+    return <td style={{ textAlign: "center", color: "#9fb1c8", fontWeight: "bold" }}>-</td>;
   }
 
-  function renderPlayersRealResultCell(matchId) {
-    const result = realResults[matchId];
-    if (!result) {
-      return <td style={{ textAlign: "center", color: "#9fb1c8", fontWeight: "bold" }}>-</td>;
-    }
-    if (result.finished) {
-      return (
-        <td style={{ background: "#f4f6fb", color: "#0f172a", textAlign: "center", fontWeight: "bold" }}>
-          <div>⚪ {t.finalResult}</div>
-          <div>{result.home_score}-{result.away_score}</div>
-        </td>
-      );
-    }
+  const liveMinute = getLiveMinute(result);
+
+  if (result.finished) {
     return (
-      <td style={{ background: "#7f1d1d", color: "white", textAlign: "center", fontWeight: "bold" }}>
-        <div>🔴 {t.liveResult}</div>
+      <td style={{ background: "#f4f6fb", color: "#0f172a", textAlign: "center", fontWeight: "bold" }}>
+        <div>⚪ {t.finalResult}</div>
         <div>{result.home_score}-{result.away_score}</div>
       </td>
     );
   }
+
+  return (
+    <td style={{ background: "#7f1d1d", color: "white", textAlign: "center", fontWeight: "bold" }}>
+      <div>🔴 {t.liveResult} {liveMinute !== null ? `${liveMinute}'` : ""}</div>
+      <div>{result.home_score}-{result.away_score}</div>
+    </td>
+  );
+}
 
   const topScorerPredictionPrefix = "topscorer::";
   const topScorerFinalPrefix = () => `topscorer-final-${selectedLeague?.id || "global"}::`;
@@ -1527,15 +1544,16 @@ async function saveRealResult(matchId, home, away, finished = true, qualifiedTea
   }
 
   const payload = {
-    match_id: matchId,
-    home_score: homeScore,
-    away_score: awayScore,
-    finished,
-    status: finished ? "FINAL" : "LIVE",
-    minute: finished ? null : liveMinute,
-    qualified_team: qualifiedTeam || null,
-    win_type: winType || null
-  };
+  match_id: matchId,
+  home_score: homeScore,
+  away_score: awayScore,
+  finished,
+  status: finished ? "FINAL" : "LIVE",
+  minute: finished ? null : liveMinute,
+  live_updated_at: finished ? null : new Date().toISOString(),
+  qualified_team: qualifiedTeam || null,
+  win_type: winType || null
+};
 
   const { error } = await supabase
     .from("real_results")
