@@ -11,7 +11,7 @@ import AdminPanel from "./components/admin/AdminPanel";
 import LeagueHome from "./components/league/LeagueHome";
 import ParticipantsRanking from "./components/rankings/ParticipantsRanking";
 import LiveCenter from "./components/live/LiveCenter";
-import { matches, groups, knockoutRounds, topScorers } from "./data";
+import { matches, groups, knockoutRounds } from "./data";
 import { translations } from "./translations";
 
 
@@ -108,10 +108,9 @@ function App() {
   const [topScorerSearch, setTopScorerSearch] = useState("");
   const [allTopScorerPredictions, setAllTopScorerPredictions] = useState([]);
   const [leagueParticipants, setLeagueParticipants] = useState([]);
-  const selectableTopScorers = Array.from(new Set([
-    ...topScorers,
-    ...players.map((p) => p.label),
-  ])).sort((a, b) => a.localeCompare(b));
+ const selectableTopScorers = Array.from(new Set(
+  players.map((p) => p.label)
+)).sort((a, b) => a.localeCompare(b));
   const normalizedTopScorerSearch = normalizeSearchText(topScorerSearch);
   const filteredTopScorers = !normalizedTopScorerSearch
     ? selectableTopScorers
