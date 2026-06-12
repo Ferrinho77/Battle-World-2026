@@ -40,9 +40,9 @@ export const matches = [
 
   // Gruppo D — Romania time saved as +03:00; browser converts automatically for other countries
   { id: "m19", group: "Gruppo D", date: "2026-06-19", kickoff: "2026-06-19T22:00:00+03:00", home: "🇺🇸 United States", away: "🇦🇺 Australia" },
-  { id: "m20", group: "Gruppo D", date: "2026-06-13", kickoff: "2026-06-13T04:00:00+03:00", home: "🇵🇾 Paraguay", away: "🇹🇷 Türkiye" },
-  { id: "m21", group: "Gruppo D", date: "2026-06-14", kickoff: "2026-06-14T07:00:00+03:00", home: "🇺🇸 United States", away: "🇵🇾 Paraguay" },
-  { id: "m22", group: "Gruppo D", date: "2026-06-20", kickoff: "2026-06-20T06:00:00+03:00", home: "🇹🇷 Türkiye", away: "🇦🇺 Australia" },
+  { id: "m20", group: "Gruppo D", date: "2026-06-13", kickoff: "2026-06-20T06:00:00+03:00", home: "🇵🇾 Paraguay", away: "🇹🇷 Türkiye" },
+  { id: "m21", group: "Gruppo D", date: "2026-06-14", kickoff: "2026-06-13T04:00:00+03:00", home: "🇺🇸 United States", away: "🇵🇾 Paraguay" },
+  { id: "m22", group: "Gruppo D", date: "2026-06-20", kickoff: "2026-06-14T07:00:00+03:00", home: "🇹🇷 Türkiye", away: "🇦🇺 Australia" },
   { id: "m23", group: "Gruppo D", date: "2026-06-26", kickoff: "2026-06-26T05:00:00+03:00", home: "🇹🇷 Türkiye", away: "🇺🇸 United States" },
   { id: "m24", group: "Gruppo D", date: "2026-06-26", kickoff: "2026-06-26T05:00:00+03:00", home: "🇦🇺 Australia", away: "🇵🇾 Paraguay" },
 
