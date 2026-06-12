@@ -31,28 +31,28 @@ export const matches = [
   { id: "m12", group: "Gruppo B", date: "2026-06-24", kickoff: "2026-06-24T22:00:00+03:00", home: "🇧🇦 Bosnia and Herzegovina", away: "🇶🇦 Qatar" },
 
   // Gruppo C — Romania time saved as +03:00; browser converts automatically for other countries
-{ id: "m13", group: "Gruppo C", date: "2026-06-20", kickoff: "2026-06-20T03:30:00+03:00", home: "🇧🇷 Brazil", away: "🇭🇹 Haiti" },
-{ id: "m14", group: "Gruppo C", date: "2026-06-20", kickoff: "2026-06-20T01:00:00+03:00", home: "🏴 Scotland", away: "🇲🇦 Morocco" },
-{ id: "m15", group: "Gruppo C", date: "2026-06-14", kickoff: "2026-06-14T01:00:00+03:00", home: "🇧🇷 Brazil", away: "🇲🇦 Morocco" },
-{ id: "m16", group: "Gruppo C", date: "2026-06-14", kickoff: "2026-06-14T04:00:00+03:00", home: "🇭🇹 Haiti", away: "🏴 Scotland" },
-{ id: "m17", group: "Gruppo C", date: "2026-06-25", kickoff: "2026-06-25T01:00:00+03:00", home: "🏴 Scotland", away: "🇧🇷 Brazil" },
-{ id: "m18", group: "Gruppo C", date: "2026-06-25", kickoff: "2026-06-25T01:00:00+03:00", home: "🇲🇦 Morocco", away: "🇭🇹 Haiti" },
+  { id: "m13", group: "Gruppo C", date: "2026-06-20", kickoff: "2026-06-20T03:30:00+03:00", home: "🇧🇷 Brazil", away: "🇭🇹 Haiti" },
+  { id: "m14", group: "Gruppo C", date: "2026-06-20", kickoff: "2026-06-20T01:00:00+03:00", home: "🇲🇦 Morocco", away: "🏴 Scotland" },
+  { id: "m15", group: "Gruppo C", date: "2026-06-14", kickoff: "2026-06-14T01:00:00+03:00", home: "🇧🇷 Brazil", away: "🇲🇦 Morocco" },
+  { id: "m16", group: "Gruppo C", date: "2026-06-14", kickoff: "2026-06-14T04:00:00+03:00", home: "🏴 Scotland", away: "🇭🇹 Haiti" },
+  { id: "m17", group: "Gruppo C", date: "2026-06-25", kickoff: "2026-06-25T01:00:00+03:00", home: "🏴 Scotland", away: "🇧🇷 Brazil" },
+  { id: "m18", group: "Gruppo C", date: "2026-06-25", kickoff: "2026-06-25T01:00:00+03:00", home: "🇭🇹 Haiti", away: "🇲🇦 Morocco" },
 
- // Gruppo D — Romania time saved as +03:00; browser converts automatically for other countries
-{ id: "m19", group: "Gruppo D", date: "2026-06-19", kickoff: "2026-06-19T22:00:00+03:00", home: "🇺🇸 United States", away: "🇦🇺 Australia" },
-{ id: "m20", group: "Gruppo D", date: "2026-06-20", kickoff: "2026-06-20T06:00:00+03:00", home: "🇹🇷 Türkiye", away: "🇵🇾 Paraguay" },
-{ id: "m21", group: "Gruppo D", date: "2026-06-13", kickoff: "2026-06-13T04:00:00+03:00", home: "🇺🇸 United States", away: "🇵🇾 Paraguay" },
-{ id: "m22", group: "Gruppo D", date: "2026-06-14", kickoff: "2026-06-14T07:00:00+03:00", home: "🇦🇺 Australia", away: "🇹🇷 Türkiye" },
-{ id: "m23", group: "Gruppo D", date: "2026-06-26", kickoff: "2026-06-26T05:00:00+03:00", home: "🇹🇷 Türkiye", away: "🇺🇸 United States" },
-{ id: "m24", group: "Gruppo D", date: "2026-06-26", kickoff: "2026-06-26T05:00:00+03:00", home: "🇵🇾 Paraguay", away: "🇦🇺 Australia" },
+  // Gruppo D — Romania time saved as +03:00; browser converts automatically for other countries
+  { id: "m19", group: "Gruppo D", date: "2026-06-19", kickoff: "2026-06-19T22:00:00+03:00", home: "🇺🇸 United States", away: "🇦🇺 Australia" },
+  { id: "m20", group: "Gruppo D", date: "2026-06-13", kickoff: "2026-06-13T04:00:00+03:00", home: "🇵🇾 Paraguay", away: "🇹🇷 Türkiye" },
+  { id: "m21", group: "Gruppo D", date: "2026-06-14", kickoff: "2026-06-14T07:00:00+03:00", home: "🇺🇸 United States", away: "🇵🇾 Paraguay" },
+  { id: "m22", group: "Gruppo D", date: "2026-06-20", kickoff: "2026-06-20T06:00:00+03:00", home: "🇹🇷 Türkiye", away: "🇦🇺 Australia" },
+  { id: "m23", group: "Gruppo D", date: "2026-06-26", kickoff: "2026-06-26T05:00:00+03:00", home: "🇹🇷 Türkiye", away: "🇺🇸 United States" },
+  { id: "m24", group: "Gruppo D", date: "2026-06-26", kickoff: "2026-06-26T05:00:00+03:00", home: "🇦🇺 Australia", away: "🇵🇾 Paraguay" },
 
   // Gruppo E — Romania time saved as +03:00; browser converts automatically for other countries
-{ id: "m25", group: "Gruppo E", date: "2026-06-21", kickoff: "2026-06-21T03:00:00+03:00", home: "🇪🇨 Ecuador", away: "🇨🇼 Curaçao" },
-{ id: "m26", group: "Gruppo E", date: "2026-06-20", kickoff: "2026-06-20T23:00:00+03:00", home: "🇩🇪 Germany", away: "🇨🇮 Ivory Coast" },
-{ id: "m27", group: "Gruppo E", date: "2026-06-14", kickoff: "2026-06-14T20:00:00+03:00", home: "🇩🇪 Germany", away: "🇨🇼 Curaçao" },
-{ id: "m28", group: "Gruppo E", date: "2026-06-15", kickoff: "2026-06-15T02:00:00+03:00", home: "🇨🇮 Ivory Coast", away: "🇪🇨 Ecuador" },
-{ id: "m29", group: "Gruppo E", date: "2026-06-25", kickoff: "2026-06-25T23:00:00+03:00", home: "🇨🇼 Curaçao", away: "🇨🇮 Ivory Coast" },
-{ id: "m30", group: "Gruppo E", date: "2026-06-25", kickoff: "2026-06-25T23:00:00+03:00", home: "🇪🇨 Ecuador", away: "🇩🇪 Germany" },
+  { id: "m25", group: "Gruppo E", date: "2026-06-21", kickoff: "2026-06-21T03:00:00+03:00", home: "🇨🇼 Curaçao", away: "🇪🇨 Ecuador" },
+  { id: "m26", group: "Gruppo E", date: "2026-06-20", kickoff: "2026-06-20T23:00:00+03:00", home: "🇩🇪 Germany", away: "🇨🇮 Ivory Coast" },
+  { id: "m27", group: "Gruppo E", date: "2026-06-14", kickoff: "2026-06-14T20:00:00+03:00", home: "🇨🇼 Curaçao", away: "🇩🇪 Germany" },
+  { id: "m28", group: "Gruppo E", date: "2026-06-15", kickoff: "2026-06-15T02:00:00+03:00", home: "🇨🇮 Ivory Coast", away: "🇪🇨 Ecuador" },
+  { id: "m29", group: "Gruppo E", date: "2026-06-25", kickoff: "2026-06-25T23:00:00+03:00", home: "🇨🇮 Ivory Coast", away: "🇨🇼 Curaçao" },
+  { id: "m30", group: "Gruppo E", date: "2026-06-25", kickoff: "2026-06-25T23:00:00+03:00", home: "🇪🇨 Ecuador", away: "🇩🇪 Germany" },
 
   // Gruppo F — Romania time saved as +03:00; browser converts automatically for other countries
   { id: "m31", group: "Gruppo F", date: "2026-06-14", kickoff: "2026-06-14T23:00:00+03:00", home: "🇳🇱 Netherlands", away: "🇯🇵 Japan" },
@@ -71,20 +71,20 @@ export const matches = [
   { id: "m42", group: "Gruppo G", date: "2026-06-27", kickoff: "2026-06-27T06:00:00+03:00", home: "🇪🇬 Egypt", away: "🇮🇷 Iran" },
 
   // Gruppo H — Romania time saved as +03:00; browser converts automatically for other countries
-{ id: "m43", group: "Gruppo H", date: "2026-06-27", kickoff: "2026-06-27T03:00:00+03:00", home: "🇨🇻 Cape Verde", away: "🇸🇦 Saudi Arabia" },
-{ id: "m44", group: "Gruppo H", date: "2026-06-27", kickoff: "2026-06-27T03:00:00+03:00", home: "🇺🇾 Uruguay", away: "🇪🇸 Spain" },
-{ id: "m45", group: "Gruppo H", date: "2026-06-15", kickoff: "2026-06-15T19:00:00+03:00", home: "🇪🇸 Spain", away: "🇨🇻 Cape Verde" },
-{ id: "m46", group: "Gruppo H", date: "2026-06-16", kickoff: "2026-06-16T01:00:00+03:00", home: "🇸🇦 Saudi Arabia", away: "🇺🇾 Uruguay" },
-{ id: "m47", group: "Gruppo H", date: "2026-06-22", kickoff: "2026-06-22T01:00:00+03:00", home: "🇺🇾 Uruguay", away: "🇨🇻 Cape Verde" },
-{ id: "m48", group: "Gruppo H", date: "2026-06-21", kickoff: "2026-06-21T19:00:00+03:00", home: "🇪🇸 Spain", away: "🇸🇦 Saudi Arabia" },
+  { id: "m43", group: "Gruppo H", date: "2026-06-27", kickoff: "2026-06-27T03:00:00+03:00", home: "🇨🇻 Cape Verde", away: "🇸🇦 Saudi Arabia" },
+  { id: "m44", group: "Gruppo H", date: "2026-06-27", kickoff: "2026-06-27T03:00:00+03:00", home: "🇪🇸 Spain", away: "🇺🇾 Uruguay" },
+  { id: "m45", group: "Gruppo H", date: "2026-06-15", kickoff: "2026-06-15T19:00:00+03:00", home: "🇨🇻 Cape Verde", away: "🇪🇸 Spain" },
+  { id: "m46", group: "Gruppo H", date: "2026-06-16", kickoff: "2026-06-16T01:00:00+03:00", home: "🇺🇾 Uruguay", away: "🇸🇦 Saudi Arabia" },
+  { id: "m47", group: "Gruppo H", date: "2026-06-22", kickoff: "2026-06-22T01:00:00+03:00", home: "🇺🇾 Uruguay", away: "🇨🇻 Cape Verde" },
+  { id: "m48", group: "Gruppo H", date: "2026-06-21", kickoff: "2026-06-21T19:00:00+03:00", home: "🇸🇦 Saudi Arabia", away: "🇪🇸 Spain" },
 
   // Gruppo I — Romania time saved as +03:00; browser converts automatically for other countries
-{ id: "m49", group: "Gruppo I", date: "2026-06-26", kickoff: "2026-06-26T22:00:00+03:00", home: "🇳🇴 Norway", away: "🇫🇷 France" },
-{ id: "m50", group: "Gruppo I", date: "2026-06-26", kickoff: "2026-06-26T22:00:00+03:00", home: "🇸🇳 Senegal", away: "🇮🇶 Iraq" },
-{ id: "m51", group: "Gruppo I", date: "2026-06-16", kickoff: "2026-06-16T22:00:00+03:00", home: "🇫🇷 France", away: "🇸🇳 Senegal" },
-{ id: "m52", group: "Gruppo I", date: "2026-06-17", kickoff: "2026-06-17T01:00:00+03:00", home: "🇮🇶 Iraq", away: "🇳🇴 Norway" },
-{ id: "m53", group: "Gruppo I", date: "2026-06-23", kickoff: "2026-06-23T00:00:00+03:00", home: "🇫🇷 France", away: "🇮🇶 Iraq" },
-{ id: "m54", group: "Gruppo I", date: "2026-06-23", kickoff: "2026-06-23T03:00:00+03:00", home: "🇳🇴 Norway", away: "🇸🇳 Senegal" },
+  { id: "m49", group: "Gruppo I", date: "2026-06-26", kickoff: "2026-06-26T22:00:00+03:00", home: "🇫🇷 France", away: "🇳🇴 Norway" },
+  { id: "m50", group: "Gruppo I", date: "2026-06-26", kickoff: "2026-06-26T22:00:00+03:00", home: "🇸🇳 Senegal", away: "🇮🇶 Iraq" },
+  { id: "m51", group: "Gruppo I", date: "2026-06-16", kickoff: "2026-06-16T22:00:00+03:00", home: "🇫🇷 France", away: "🇸🇳 Senegal" },
+  { id: "m52", group: "Gruppo I", date: "2026-06-17", kickoff: "2026-06-17T01:00:00+03:00", home: "🇮🇶 Iraq", away: "🇳🇴 Norway" },
+  { id: "m53", group: "Gruppo I", date: "2026-06-23", kickoff: "2026-06-23T00:00:00+03:00", home: "🇮🇶 Iraq", away: "🇫🇷 France" },
+  { id: "m54", group: "Gruppo I", date: "2026-06-23", kickoff: "2026-06-23T03:00:00+03:00", home: "🇳🇴 Norway", away: "🇸🇳 Senegal" },
 
   // Gruppo J — Romania time saved as +03:00; browser converts automatically for other countries
   { id: "m55", group: "Gruppo J", date: "2026-06-17", kickoff: "2026-06-17T04:00:00+03:00", home: "🇦🇷 Argentina", away: "🇩🇿 Algeria" },
@@ -94,13 +94,13 @@ export const matches = [
   { id: "m59", group: "Gruppo J", date: "2026-06-28", kickoff: "2026-06-28T05:00:00+03:00", home: "🇯🇴 Jordan", away: "🇦🇷 Argentina" },
   { id: "m60", group: "Gruppo J", date: "2026-06-28", kickoff: "2026-06-28T05:00:00+03:00", home: "🇩🇿 Algeria", away: "🇦🇹 Austria" },
 
- // Gruppo K — Romania time saved as +03:00; browser converts automatically for other countries
-{ id: "m61", group: "Gruppo K", date: "2026-06-17", kickoff: "2026-06-17T20:00:00+03:00", home: "🇵🇹 Portugal", away: "🇨🇩 DR Congo" },
-{ id: "m62", group: "Gruppo K", date: "2026-06-18", kickoff: "2026-06-18T05:00:00+03:00", home: "🇺🇿 Uzbekistan", away: "🇨🇴 Colombia" },
-{ id: "m63", group: "Gruppo K", date: "2026-06-28", kickoff: "2026-06-28T02:30:00+03:00", home: "🇨🇴 Colombia", away: "🇵🇹 Portugal" },
-{ id: "m64", group: "Gruppo K", date: "2026-06-28", kickoff: "2026-06-28T02:30:00+03:00", home: "🇨🇩 DR Congo", away: "🇺🇿 Uzbekistan" },
-{ id: "m65", group: "Gruppo K", date: "2026-06-23", kickoff: "2026-06-23T20:00:00+03:00", home: "🇵🇹 Portugal", away: "🇺🇿 Uzbekistan" },
-{ id: "m66", group: "Gruppo K", date: "2026-06-24", kickoff: "2026-06-24T05:00:00+03:00", home: "🇨🇴 Colombia", away: "🇨🇩 DR Congo" },
+  // Gruppo K — Romania time saved as +03:00; browser converts automatically for other countries
+  { id: "m61", group: "Gruppo K", date: "2026-06-17", kickoff: "2026-06-17T20:00:00+03:00", home: "🇵🇹 Portugal", away: "🇨🇩 DR Congo" },
+  { id: "m62", group: "Gruppo K", date: "2026-06-18", kickoff: "2026-06-18T05:00:00+03:00", home: "🇨🇴 Colombia", away: "🇺🇿 Uzbekistan" },
+  { id: "m63", group: "Gruppo K", date: "2026-06-28", kickoff: "2026-06-28T02:30:00+03:00", home: "🇵🇹 Portugal", away: "🇨🇴 Colombia" },
+  { id: "m64", group: "Gruppo K", date: "2026-06-28", kickoff: "2026-06-28T02:30:00+03:00", home: "🇺🇿 Uzbekistan", away: "🇨🇩 DR Congo" },
+  { id: "m65", group: "Gruppo K", date: "2026-06-23", kickoff: "2026-06-23T20:00:00+03:00", home: "🇺🇿 Uzbekistan", away: "🇵🇹 Portugal" },
+  { id: "m66", group: "Gruppo K", date: "2026-06-24", kickoff: "2026-06-24T05:00:00+03:00", home: "🇨🇩 DR Congo", away: "🇨🇴 Colombia" },
 
   // Gruppo L — Romania time saved as +03:00; browser converts automatically for other countries
   { id: "m67", group: "Gruppo L", date: "2026-06-17", kickoff: "2026-06-17T23:00:00+03:00", home: "🏴 England", away: "🇭🇷 Croatia" },
