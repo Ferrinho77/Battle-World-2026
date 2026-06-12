@@ -233,12 +233,12 @@ function App() {
     return <p style={{ color: "#f5a524", fontWeight: "bold" }}>🟡 {t.pending}</p>;
   }
 
- function getLiveMinute(result) {
+function getLiveMinute(result) {
   if (!result || result.finished || result.minute === null || result.minute === undefined) return null;
   if (!result.live_updated_at) return result.minute;
 
   const updatedAt = new Date(result.live_updated_at).getTime();
-  const diffMinutes = Math.floor((Date.now() - updatedAt) / 60000);
+  const diffMinutes = Math.floor((nowTick.getTime() - updatedAt) / 60000);
 
   return Math.min(130, Number(result.minute) + Math.max(0, diffMinutes));
 }
