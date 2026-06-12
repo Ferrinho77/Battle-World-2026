@@ -2082,20 +2082,33 @@ function updatePrediction(matchId, field, value) {
     setMessage(`${t.resultConfirmed}: ${finalTopScorer} ✅`);
   }
 
-  async function saveTopScorerGoals() {
-    if (!topScorerGoalsPlayer) { setMessage(t.selectPlayerMessage); return; }
-    if (topScorerGoals === "" || Number(topScorerGoals) < 0) { setMessage(t.enterRealResult); return; }
-    const prefix = topScorerGoalsPrefix();
-    const { error } = await supabase.from("real_results").upsert({
-      match_id: `${prefix}${encodeTopScorer(topScorerGoalsPlayer)}`,
-      home_score: Number(topScorerGoals),
-      away_score: 0,
-      finished: false,
-    });
-    if (error) { setMessage(error.message); return; }
-    await loadRealResults();
-    setMessage(`${t.liveResultSaved}: ${topScorerGoalsPlayer} (${topScorerGoals}) 🔵`);
+async function saveTopScorerGoals() {
+  if (!topScorerGoalsPlayer) { setMessage(t.selectPlayerMessage); return; }
+
+  const goalsToAdd = Number(topScorerGoals);
+
+  if (topScorerGoals === "" || !Number.isInteger(goalsToAdd) || goalsToAdd <= 0) {
+    setMessage("Inserisci i gol da aggiungere");
+    return;
   }
+
+  const prefix = topScorerGoalsPrefix();
+  const matchId = `${prefix}${encodeTopScorer(topScorerGoalsPlayer)}`;
+  const current = realResults[matchId]?.home_score || 0;
+  const newTotal = Number(current) + goalsToAdd;
+
+  const { error } = await supabase.from("real_results").upsert({
+    match_id: matchId,
+    home_score: newTotal,
+    away_score: 0,
+    finished: false,
+  }, { onConflict: "match_id" });
+
+  if (error) { setMessage(error.message); return; }
+
+  await loadRealResults();
+  setMessage(`${t.liveResultSaved}: ${topScorerGoalsPlayer} +${goalsToAdd} gol / Totale ${newTotal} 🔵`);
+}
 
   if (resetMode) {
     return (
