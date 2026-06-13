@@ -13,12 +13,14 @@ export default function AdminPanel({
   trTeamLabel,
   renderRealResult,
   saveRealResult,
-  selectableTopScorers,
-  topScorerGoalsPlayer,
-  setTopScorerGoalsPlayer,
-  topScorerGoals,
-  setTopScorerGoals,
-  saveTopScorerGoals,
+selectableTopScorers,
+players = [],
+topScorerGoalsTeam,
+setTopScorerGoalsTeam,
+topScorerGoalsPlayer,
+topScorerGoals,
+setTopScorerGoals,
+saveTopScorerGoals,
   confirmedTopScorer,
   finalTopScorer,
   setFinalTopScorer,
@@ -35,32 +37,53 @@ export default function AdminPanel({
   adminContent,
 }) {
   const [activeAdminTab, setActiveAdminTab] = useState("dashboard");
+   
+ const normalizeTeamName = (value) =>
+  String(value || "")
+    .replace(/^[^\wÀ-ÿ]+/u, "")
+    .trim();
 
-  const roundOrder = {
-    group: 0,
-    Sedicesimi: 1,
-    Ottavi: 2,
-    Quarti: 3,
-    Semifinali: 4,
-    "Finale 3° posto": 5,
-    Finale: 6,
-  };
+const topScorerTeams = Array.from(
+  new Set((players || []).map((p) => normalizeTeamName(p.team)).filter(Boolean))
+).sort();
 
-  const getMatchRoundKey = (match) => (match.round ? match.round : "group");
-  const isKnockoutMatch = (match) => !!match.round;
-  const getInputValue = (id) => document.getElementById(id)?.value ?? "";
+const filteredAdminTopScorers = (players || [])
+  .filter((p) =>
+    topScorerGoalsTeam
+      ? normalizeTeamName(p.team) === normalizeTeamName(topScorerGoalsTeam)
+      : true
+  )
+  .map((p) => p.label)
+  .filter(Boolean)
+  .sort((a, b) => a.localeCompare(b));
+const roundOrder = {
+  group: 0,
+  Sedicesimi: 1,
+  Ottavi: 2,
+  Quarti: 3,
+  Semifinali: 4,
+  "Finale 3° posto": 5,
+  Finale: 6,
+};
 
-  const getKnockoutQualifiedValue = (match) => {
-    const selected = getInputValue(`rq-${match.id}`);
-    if (selected) return selected;
-    const homeScore = Number(getInputValue(`rh-${match.id}`));
-    const awayScore = Number(getInputValue(`ra-${match.id}`));
-    if (Number.isFinite(homeScore) && Number.isFinite(awayScore)) {
-      if (homeScore > awayScore) return match.home;
-      if (awayScore > homeScore) return match.away;
-    }
-    return "";
-  };
+const getMatchRoundKey = (match) => (match.round ? match.round : "group");
+const isKnockoutMatch = (match) => !!match.round;
+const getInputValue = (id) => document.getElementById(id)?.value ?? "";
+
+const getKnockoutQualifiedValue = (match) => {
+  const selected = getInputValue(`rq-${match.id}`);
+  if (selected) return selected;
+
+  const homeScore = Number(getInputValue(`rh-${match.id}`));
+  const awayScore = Number(getInputValue(`ra-${match.id}`));
+
+  if (Number.isFinite(homeScore) && Number.isFinite(awayScore)) {
+    if (homeScore > awayScore) return match.home;
+    if (awayScore > homeScore) return match.away;
+  }
+
+  return "";
+};
 
   const getKnockoutWinType = (match) => {
     const homeScore = Number(getInputValue(`rh-${match.id}`));
@@ -333,10 +356,28 @@ export default function AdminPanel({
             <div className="league-box">
               <h3>🔴 {t.topScorerRanking}</h3>
               <p className="bonus-help">{t.adminTopScorerInfo || "Aggiorna i gol provvisori dei capocannonieri durante il torneo."}</p>
-              <select value={topScorerGoalsPlayer} onChange={(event) => setTopScorerGoalsPlayer(event.target.value)}>
-                <option value="">{t.selectPlayer}</option>
-                {selectableTopScorers.map((player) => <option key={player} value={player}>{player}</option>)}
-              </select>
+              <select
+  value={topScorerGoalsTeam}
+  onChange={(event) => {
+    setTopScorerGoalsTeam(event.target.value);
+    setTopScorerGoalsPlayer("");
+  }}
+>
+  <option value="">Tutte le squadre</option>
+  {topScorerTeams.map((team) => (
+    <option key={team} value={team}>{team}</option>
+  ))}
+</select>
+
+<select
+  value={topScorerGoalsPlayer}
+  onChange={(event) => setTopScorerGoalsPlayer(event.target.value)}
+>
+  <option value="">{t.selectPlayer}</option>
+  {filteredAdminTopScorers.map((player) => (
+    <option key={player} value={player}>{player}</option>
+  ))}
+</select>
               <input type="number" min="0" max="30" placeholder={t.goals} value={topScorerGoals} onChange={(event) => setTopScorerGoals(event.target.value)} />
               <button className="btn blue" onClick={saveTopScorerGoals}>{t.saveTopScorerGoals}</button>
             </div>

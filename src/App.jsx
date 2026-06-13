@@ -103,6 +103,7 @@ function App() {
   const [finalTopScorer, setFinalTopScorer] = useState("");
   const [topScorerGoalsPlayer, setTopScorerGoalsPlayer] = useState("");
   const [topScorerGoals, setTopScorerGoals] = useState("");
+  const [topScorerGoalsTeam, setTopScorerGoalsTeam] = useState("");
   const [players, setPlayers] = useState([]);
   const [playersLoading, setPlayersLoading] = useState(false);
   const [topScorerSearch, setTopScorerSearch] = useState("");
@@ -432,26 +433,47 @@ function renderPlayersRealResultCell(matchId) {
   }, [user, selectedLeague?.id, hasLiveMatches]);
 
   async function loadPlayers() {
-    setPlayersLoading(true);
+  setPlayersLoading(true);
+
+  const allRows = [];
+
+  for (let from = 0; from <= 2000; from += 1000) {
+    const to = from + 999;
+
     const { data, error } = await supabase
       .from("players")
-      .select("id,name,team,flag,position,is_active,sort_order")
+      .select("id,name,team,flag,position,is_goalkeeper,is_active,sort_order")
       .eq("is_active", true)
+      .eq("is_goalkeeper", false)
       .order("team", { ascending: true })
       .order("sort_order", { ascending: true })
-      .order("name", { ascending: true });
+      .order("name", { ascending: true })
+      .range(from, to);
 
-    if (!error && Array.isArray(data) && data.length) {
-      const formatted = data.map((player) => ({
-        ...player,
-        label: `${player.flag ? `${player.flag} ` : ""}${player.name}${player.team ? ` (${player.team})` : ""}`,
-      }));
-      setPlayers(formatted);
-    } else {
+    if (error) {
+      console.error("loadPlayers error", error);
       setPlayers([]);
+      setPlayersLoading(false);
+      return;
     }
-    setPlayersLoading(false);
+
+    if (Array.isArray(data)) {
+      allRows.push(...data);
+    }
+
+    if (!data || data.length < 1000) break;
   }
+
+  const formatted = allRows.map((player) => ({
+    ...player,
+    label: `${player.flag ? `${player.flag} ` : ""}${player.name}${player.team ? ` (${player.team})` : ""}`,
+  }));
+
+  console.log("PLAYERS LOADED TOTAL", formatted.length);
+
+  setPlayers(formatted);
+  setPlayersLoading(false);
+}
 
   function getRoundStartDate(roundName) {
     const allRoundMatches = buildKnockoutMatches().filter((m) => m.round === roundName && m.kickoff);
@@ -3243,6 +3265,9 @@ async function saveTopScorerGoals() {
             renderRealResult={renderRealResult}
             saveRealResult={saveRealResult}
             selectableTopScorers={selectableTopScorers}
+            players={players}
+            topScorerGoalsTeam={topScorerGoalsTeam}
+            setTopScorerGoalsTeam={setTopScorerGoalsTeam}
             topScorerGoalsPlayer={topScorerGoalsPlayer}
             setTopScorerGoalsPlayer={setTopScorerGoalsPlayer}
             topScorerGoals={topScorerGoals}
