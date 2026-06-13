@@ -92,29 +92,40 @@ const getKnockoutQualifiedValue = (match) => {
     return getInputValue(`rwt-${match.id}`) || "EXTRA_TIME";
   };
 
-  const saveAdminMatchResult = (match, finished) => {
+const saveAdminMatchResult = (match, phase) => {
   const home = getInputValue(`rh-${match.id}`);
   const away = getInputValue(`ra-${match.id}`);
   const minute = getInputValue(`rm-${match.id}`);
 
+  const finished = phase === "FINAL";
+
   if (!isKnockoutMatch(match)) {
-    saveRealResult(match.id, home, away, finished, null, null, minute);
-    return;
-  }
-
-  const qualifiedTeam = finished
-    ? getKnockoutQualifiedValue(match)
-    : (getInputValue(`rq-${match.id}`) || "");
-
-  const winType = getKnockoutWinType(match);
-
-  if (finished && !qualifiedTeam) {
-    alert(
-      t.selectQualifiedTeamBeforeConfirm ||
-      "Seleziona la squadra qualificata prima di confermare il risultato finale."
+    saveRealResult(
+      match.id,
+      home,
+      away,
+      finished,
+      null,
+      null,
+      minute,
+      phase
     );
     return;
-  }
+  };
+
+  const qualifiedTeam = finished
+  ? getKnockoutQualifiedValue(match)
+  : (getInputValue(`rq-${match.id}`) || "");
+
+const winType = getKnockoutWinType(match);
+
+if (finished && !qualifiedTeam) {
+  alert(
+    t.selectQualifiedTeamBeforeConfirm ||
+    "Seleziona la squadra qualificata prima di confermare il risultato finale."
+  );
+  return;
+}
 
   saveRealResult(
     match.id,
@@ -123,9 +134,11 @@ const getKnockoutQualifiedValue = (match) => {
     finished,
     qualifiedTeam,
     winType,
-    minute
+    minute,
+    phase
   );
 };
+
 
   const adminDisplayMatches = [...allDisplayMatches]
     .sort((a, b) => {
@@ -210,76 +223,140 @@ const getKnockoutQualifiedValue = (match) => {
         </>
       )}
 
-      {activeAdminTab === "results" && (
-        <>
-          <div className="admin-toolbar league-box admin-toolbar-sticky">
-            <div>
-              <label>{t.matchFilter || "Filtro partite"}</label>
-              <select value={adminMatchFilter} onChange={(event) => setAdminMatchFilter(event.target.value)}>
-                <option value="all">{t.all || "Tutte"}</option>
-                <option value="pending">{t.toEnter || "Da inserire"}</option>
-                <option value="live">{t.live}</option>
-                <option value="final">{t.finals || "Finali"}</option>
-              </select>
-            </div>
-          </div>
 
-          <div className="admin-section-title">
-            <h3>{t.insertRealResults}</h3>
-            <p className="bonus-help">{t.manualResultsModeHelp || "Modalità locale: inserisci LIVE o FINAL manualmente."}</p>
-          </div>
+{activeAdminTab === "results" && (
+  <>
+    <div className="admin-toolbar league-box admin-toolbar-sticky">
+      <div>
+        <label>{t.matchFilter || "Filtro partite"}</label>
+        <select value={adminMatchFilter} onChange={(event) => setAdminMatchFilter(event.target.value)}>
+          <option value="all">{t.all || "Tutte"}</option>
+          <option value="pending">{t.toEnter || "Da inserire"}</option>
+          <option value="live">{t.live}</option>
+          <option value="final">{t.finals || "Finali"}</option>
+        </select>
+      </div>
+    </div>
 
-          {adminMatchSections.map(([sectionName, sectionMatches]) => (
-            <div key={sectionName} className="admin-round-section">
-              <h3 className="admin-round-title">{sectionName}</h3>
-              <div className="admin-match-grid">
-                {sectionMatches.map((match) => {
-                  const result = realResults[match.id];
-                  const isFinal = !!result?.finished;
-                  const statusClass = isFinal ? "admin-final" : result ? "admin-live" : "admin-pending";
-                  const statusLabel = isFinal ? `✅ ${t.finalStatus || "FINAL"}` : result ? `🔴 ${t.liveStatus || "LIVE"}` : `🟡 ${t.pendingStatus || "PENDING"}`;
+    <div className="admin-section-title">
+      <h3>{t.insertRealResults}</h3>
+      <p className="bonus-help">{t.manualResultsModeHelp || "Modalità locale: inserisci LIVE o FINAL manualmente."}</p>
+    </div>
 
-                  return (
-                    <div key={match.id} className={`match-box admin-match-card ${statusClass}`}>
-                      <div className="admin-match-head"><span>{statusLabel}</span><small>📅 {formatMatchDateTime(match)}</small></div>
-                      <strong>{trTeamLabel(match.home)} - {trTeamLabel(match.away)}</strong>
-                      {renderRealResult(match.id)}
-       {isKnockoutMatch(match) && <p className="bonus-help" style={{ marginTop: 8 }}>{t.knockoutResultAdminHelp || "Risultato dopo i 90 minuti per i pronostici. La squadra qualificata serve per tabellone e bonus passaggio turno."}</p>}
-                      <div className="score-row">
-  <input id={`rh-${match.id}`} type="number" min="0" max="20" placeholder={isKnockoutMatch(match) ? `${t.home} 90'` : t.home} defaultValue={result?.home_score ?? ""} disabled={isFinal} />
-  <input id={`ra-${match.id}`} type="number" min="0" max="20" placeholder={isKnockoutMatch(match) ? `${t.away} 90'` : t.away} defaultValue={result?.away_score ?? ""} disabled={isFinal} />
-  <input id={`rm-${match.id}`} type="number" min="0" max="130" placeholder="Min." defaultValue={result?.minute ?? ""} disabled={isFinal} />
-</div>
-                      {isKnockoutMatch(match) && (
-                        <div className="score-row">
-                          <select id={`rq-${match.id}`} defaultValue={result?.qualified_team || ""} disabled={isFinal}>
-                            <option value="">{t.qualifiedTeam || "Qualificata"}</option>
-                            <option value={match.home}>{trTeamLabel(match.home)}</option>
-                            <option value={match.away}>{trTeamLabel(match.away)}</option>
-                          </select>
-                          <select id={`rwt-${match.id}`} defaultValue={result?.win_type || "REGULAR"} disabled={isFinal}>
-                            <option value="REGULAR">90'</option>
-                            <option value="EXTRA_TIME">{t.extraTimeShort || "DTS"}</option>
-                            <option value="PENALTIES">{t.penaltiesShort || "Rigori"}</option>
-                          </select>
-                        </div>
-                      )}
-                      {isFinal ? (
-                        <div className="admin-actions-row"><button className="btn green" disabled>🔒 {t.confirmed || "Confermato"}</button></div>
-                      ) : (
-                        <div className="admin-actions-row">
-                          <button className="btn blue" onClick={() => saveAdminMatchResult(match, false)}>{t.saveLiveResult}</button>
-                          <button className="btn green" onClick={() => saveAdminMatchResult(match, true)}>{t.confirmFinalResult}</button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+    {adminMatchSections.map(([sectionName, sectionMatches]) => (
+      <div key={sectionName} className="admin-round-section">
+        <h3 className="admin-round-title">{sectionName}</h3>
+
+        <div className="admin-match-grid">
+          {sectionMatches.map((match) => {
+            const result = realResults[match.id];
+            const isFinal = !!result?.finished;
+            const statusClass = isFinal ? "admin-final" : result ? "admin-live" : "admin-pending";
+            const statusLabel = isFinal
+              ? `✅ ${t.finalStatus || "FINAL"}`
+              : result
+                ? `🔴 ${t.liveStatus || "LIVE"}`
+                : `🟡 ${t.pendingStatus || "PENDING"}`;
+
+            return (
+              <div key={match.id} className={`match-box admin-match-card ${statusClass}`}>
+                <div className="admin-match-head">
+                  <span>{statusLabel}</span>
+                  <small>📅 {formatMatchDateTime(match)}</small>
+                </div>
+
+                <strong>{trTeamLabel(match.home)} - {trTeamLabel(match.away)}</strong>
+
+                {renderRealResult(match.id)}
+
+                {isKnockoutMatch(match) && (
+                  <p className="bonus-help" style={{ marginTop: 8 }}>
+                    {t.knockoutResultAdminHelp ||
+                      "Risultato dopo i 90 minuti per i pronostici. La squadra qualificata serve per tabellone e bonus passaggio turno."}
+                  </p>
+                )}
+
+                <div className="score-row">
+                  <input
+                    id={`rh-${match.id}`}
+                    type="number"
+                    min="0"
+                    max="20"
+                    placeholder={isKnockoutMatch(match) ? `${t.home} 90'` : t.home}
+                    defaultValue={result?.home_score ?? ""}
+                    disabled={isFinal}
+                  />
+
+                  <input
+                    id={`ra-${match.id}`}
+                    type="number"
+                    min="0"
+                    max="20"
+                    placeholder={isKnockoutMatch(match) ? `${t.away} 90'` : t.away}
+                    defaultValue={result?.away_score ?? ""}
+                    disabled={isFinal}
+                  />
+
+                  <input
+                    id={`rm-${match.id}`}
+                    type="number"
+                    min="0"
+                    max="130"
+                    placeholder="Min."
+                    defaultValue={result?.minute ?? ""}
+                    disabled={isFinal}
+                  />
+                </div>
+
+                {isKnockoutMatch(match) && (
+                  <div className="score-row">
+                    <select id={`rq-${match.id}`} defaultValue={result?.qualified_team || ""} disabled={isFinal}>
+                      <option value="">{t.qualifiedTeam || "Qualificata"}</option>
+                      <option value={match.home}>{trTeamLabel(match.home)}</option>
+                      <option value={match.away}>{trTeamLabel(match.away)}</option>
+                    </select>
+
+                    <select id={`rwt-${match.id}`} defaultValue={result?.win_type || "REGULAR"} disabled={isFinal}>
+                      <option value="REGULAR">90'</option>
+                      <option value="EXTRA_TIME">{t.extraTimeShort || "DTS"}</option>
+                      <option value="PENALTIES">{t.penaltiesShort || "Rigori"}</option>
+                    </select>
+                  </div>
+                )}
+
+                {isFinal ? (
+                  <div className="admin-actions-row">
+                    <button className="btn green" disabled>
+                      🔒 {t.confirmed || "Confermato"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="admin-actions-row" style={{ flexWrap: "wrap" }}>
+                    <button className="btn blue" onClick={() => saveAdminMatchResult(match, "FIRST_HALF")}>
+                      1° Tempo
+                    </button>
+
+                    <button className="btn blue" onClick={() => saveAdminMatchResult(match, "HALF_TIME")}>
+                      Intervallo
+                    </button>
+
+                    <button className="btn blue" onClick={() => saveAdminMatchResult(match, "SECOND_HALF")}>
+                      2° Tempo
+                    </button>
+
+                    <button className="btn green" onClick={() => saveAdminMatchResult(match, "FINAL")}>
+                      Finale
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
-        </>
-      )}
+            );
+          })}
+        </div>
+      </div>
+    ))}
+  </>
+)}
 
       {activeAdminTab === "qualifications" && (
         <div className="league-box">

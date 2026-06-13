@@ -14,6 +14,7 @@ export default function LiveCenter({
   trTeamLabel,
   groups,
   getGroupStandings,
+  getLiveMinute,
 }) {
   const sortedMatches = [...matches].sort(
     (a, b) => new Date(a.kickoff || "2099-01-01") - new Date(b.kickoff || "2099-01-01")
@@ -87,6 +88,7 @@ export default function LiveCenter({
                   key={match.id}
                   match={match}
                   result={realResults[match.id]}
+                  getLiveMinute={getLiveMinute}
                   events={matchEvents?.[match.id] || []}
                   formatMatchDateTime={formatMatchDateTime}
                   trTeamLabel={trTeamLabel}
@@ -112,6 +114,7 @@ export default function LiveCenter({
                   key={match.id}
                   match={match}
                   result={realResults[match.id]}
+                  getLiveMinute={getLiveMinute}
                   events={matchEvents?.[match.id] || []}
                   formatMatchDateTime={formatMatchDateTime}
                   trTeamLabel={trTeamLabel}

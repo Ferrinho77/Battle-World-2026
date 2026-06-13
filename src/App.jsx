@@ -235,8 +235,15 @@ function App() {
   }
 
 function getLiveMinute(result) {
-  if (!result || result.finished || result.minute === null || result.minute === undefined) return null;
-  if (!result.live_updated_at) return result.minute;
+  if (!result) return null;
+
+  if (result.match_phase === "HALF_TIME") {
+    return result.minute;
+  }
+
+  if (!result.live_updated_at) {
+    return result.minute;
+  }
 
   const updatedAt = new Date(result.live_updated_at).getTime();
   const diffMinutes = Math.floor((nowTick.getTime() - updatedAt) / 60000);
@@ -1559,7 +1566,7 @@ function getPlayersInLeague() {
     setMatchEvents(formatted);
   }
 
-async function saveRealResult(matchId, home, away, finished = true, qualifiedTeam = null, winType = null, minute = "") {
+async function saveRealResult(matchId, home, away, finished = true, qualifiedTeam = null, winType = null, minute = "", matchPhase = null) {
   if (home === "" || away === "") { setMessage(t.enterRealResult); return; }
 
   const homeScore = Number(home);
@@ -1576,17 +1583,20 @@ async function saveRealResult(matchId, home, away, finished = true, qualifiedTea
     return;
   }
 
+  const phase = finished ? "FINAL" : (matchPhase || "LIVE");
+
   const payload = {
-  match_id: matchId,
-  home_score: homeScore,
-  away_score: awayScore,
-  finished,
-  status: finished ? "FINAL" : "LIVE",
-  minute: finished ? null : liveMinute,
-  live_updated_at: finished ? null : new Date().toISOString(),
-  qualified_team: qualifiedTeam || null,
-  win_type: winType || null
-};
+    match_id: matchId,
+    home_score: homeScore,
+    away_score: awayScore,
+    finished,
+    status: finished ? "FINAL" : "LIVE",
+    minute: liveMinute,
+    live_updated_at: (finished || phase === "HALF_TIME") ? null : new Date().toISOString(),
+    match_phase: phase,
+    qualified_team: qualifiedTeam || null,
+    win_type: winType || null
+  };
 
   const { error } = await supabase
     .from("real_results")
@@ -2550,6 +2560,7 @@ async function saveTopScorerGoals() {
             t={t}
             matches={allDisplayMatches}
             realResults={realResults}
+            getLiveMinute={getLiveMinute}
             matchEvents={matchEvents}
             lastLiveSync={lastLiveSync}
             liveSyncStatus={liveSyncStatus}

@@ -19,6 +19,7 @@ export default function LiveMatchCard({
   t,
   match,
   result,
+  getLiveMinute,
   events = [],
   formatMatchDateTime,
   trTeamLabel,
@@ -26,7 +27,7 @@ export default function LiveMatchCard({
 }) {
   const isLive = result && !result.finished;
   const isFinal = result?.finished;
-  const minute = result?.minute ? `${result.minute}'` : getLiveMinute(match, result);
+  const minute = result ? getLiveMinute(result) : null;
 
   return (
     <div className={`live-match-pro-card ${isLive ? "is-live" : ""} ${isFinal ? "is-final" : ""}`}>
