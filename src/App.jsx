@@ -3179,15 +3179,14 @@ async function saveTopScorerGoals() {
             </p>
           </div>
           <div className="player-autocomplete">
-            <input
-              disabled={isTournamentStarted()}
-              placeholder={t.searchPlayer}
-              value={topScorerSearch}
-              onChange={(e) => {
-                setTopScorerSearch(e.target.value);
-                setSelectedTopScorer("");
-              }}
-            />
+           <input
+  disabled={isTournamentStarted()}
+  placeholder={t.searchPlayer}
+  value={topScorerSearch}
+  onChange={(e) => {
+    setTopScorerSearch(e.target.value);
+  }}
+/>
 
             {topScorerSearch && !isTournamentStarted() && (
               <div className="player-suggestions">
@@ -3197,9 +3196,10 @@ async function saveTopScorerGoals() {
                     key={player}
                     className={selectedTopScorer === player ? "active" : ""}
                     onClick={() => {
-                      setSelectedTopScorer(player);
-                      setTopScorerSearch(player);
-                    }}
+  console.log("TOP SCORER SELECTED", player);
+  setSelectedTopScorer(player);
+  setTopScorerSearch(player);
+}}
                   >
                     {player}
                   </button>
@@ -3228,9 +3228,10 @@ async function saveTopScorerGoals() {
                     className={selectedTopScorer === player ? "active" : ""}
                     disabled={isTournamentStarted()}
                     onClick={() => {
-                      setSelectedTopScorer(player);
-                      setTopScorerSearch(player);
-                    }}
+  console.log("TOP SCORER SELECTED", player);
+  setSelectedTopScorer(player);
+  setTopScorerSearch(player);
+}}
                   >
                     {player}
                   </button>
