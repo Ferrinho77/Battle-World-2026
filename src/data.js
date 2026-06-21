@@ -116,67 +116,73 @@ export const knockoutRounds = [
   {
     round: "Sedicesimi",
     matches: [
-      "2A - 2B",          // FIFA Match 73
-      "1E - 3ABCDF",      // FIFA Match 74
-      "1F - 2C",          // FIFA Match 75
-      "1C - 2F",          // FIFA Match 76
-      "1I - 3CDFGH",      // FIFA Match 77
-      "2E - 2I",          // FIFA Match 78
-      "1A - 3CEFHI",      // FIFA Match 79
-      "1L - 3EHIJK",      // FIFA Match 80
-      "1D - 3BEFIJ",      // FIFA Match 81
-      "1G - 3AEHIJ",      // FIFA Match 82
-      "2K - 2L",          // FIFA Match 83
-      "1H - 2J",          // FIFA Match 84
-      "1B - 3EFGIJ",      // FIFA Match 85
-      "1J - 2H",          // FIFA Match 86
-      "1K - 3DEIJL",      // FIFA Match 87
-      "2D - 2G",          // FIFA Match 88
+      "2A - 2B",
+      "1F - 2C",
+
+      "1E - 3ABCDF",
+      "1I - 3CDFGH",
+
+      "1C - 2F",
+      "2E - 2I",
+
+      "1A - 3CEFHI",
+      "1L - 3EHIJK",
+
+      "2K - 2L",
+      "1H - 2J",
+
+      "1D - 3BEFIJ",
+      "1G - 3AEHIJ",
+
+      "1J - 2H",
+      "2D - 2G",
+
+      "1B - 3EFGIJ",
+      "1K - 3DEIJL",
     ],
   },
   {
     round: "Ottavi",
     matches: [
-      "Vincente S2 - Vincente S5",    // FIFA Match 89: W74 vs W77
-      "Vincente S1 - Vincente S3",    // FIFA Match 90: W73 vs W75
-      "Vincente S4 - Vincente S6",    // FIFA Match 91: W76 vs W78
-      "Vincente S7 - Vincente S8",    // FIFA Match 92: W79 vs W80
-      "Vincente S11 - Vincente S12",  // FIFA Match 93: W83 vs W84
-      "Vincente S9 - Vincente S10",   // FIFA Match 94: W81 vs W82
-      "Vincente S14 - Vincente S16",  // FIFA Match 95: W86 vs W88
-      "Vincente S13 - Vincente S15",  // FIFA Match 96: W85 vs W87
+      "Vincente S1 - Vincente S2",
+      "Vincente S3 - Vincente S4",
+      "Vincente S5 - Vincente S6",
+      "Vincente S7 - Vincente S8",
+      "Vincente S9 - Vincente S10",
+      "Vincente S11 - Vincente S12",
+      "Vincente S13 - Vincente S14",
+      "Vincente S15 - Vincente S16",
     ],
   },
   {
     round: "Quarti",
     matches: [
-      "Vincente O1 - Vincente O2",    // FIFA Match 97: W89 vs W90
-      "Vincente O5 - Vincente O6",    // FIFA Match 98: W93 vs W94
-      "Vincente O3 - Vincente O4",    // FIFA Match 99: W91 vs W92
-      "Vincente O7 - Vincente O8",    // FIFA Match 100: W95 vs W96
+      "Vincente O1 - Vincente O2",
+      "Vincente O3 - Vincente O4",
+      "Vincente O5 - Vincente O6",
+      "Vincente O7 - Vincente O8",
     ],
   },
   {
     round: "Semifinali",
     matches: [
-      "Vincente Q1 - Vincente Q2",    // FIFA Match 101: W97 vs W98
-      "Vincente Q3 - Vincente Q4",    // FIFA Match 102: W99 vs W100
+      "Vincente Q1 - Vincente Q2",
+      "Vincente Q3 - Vincente Q4",
     ],
   },
   {
     round: "Finale 3° posto",
     matches: [
-      "Perdente SF1 - Perdente SF2",  // FIFA Match 103
+      "Perdente SF1 - Perdente SF2",
     ],
   },
   {
     round: "Finale",
     matches: [
-      "Vincente SF1 - Vincente SF2",  // FIFA Match 104
+      "Vincente SF1 - Vincente SF2",
     ],
   },
 ];
-
 export const topScorers = [
   "🇲🇽 Santiago Giménez (Mexico)",
   "🇲🇽 Raúl Jiménez (Mexico)",

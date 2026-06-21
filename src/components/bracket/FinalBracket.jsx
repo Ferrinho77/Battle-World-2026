@@ -25,18 +25,25 @@ export default function FinalBracket({
                   return (
                     <div key={match.id} className={`bracket-card ${isFinal ? "final-card" : ""}`}>
                       <div className="bracket-card-head">
-                        <span>{match.code}</span>
-                        <small>📅 {formatMatchDateTime(match)}</small>
-                      </div>
-                      <div className="team-line">
-                        <span>{trTeamLabel(match.home)}</span>
-                        <strong>{real?.home_score ?? "-"}</strong>
-                      </div>
-                      <div className="team-line">
-                        <span>{trTeamLabel(match.away)}</span>
-                        <strong>{real?.away_score ?? "-"}</strong>
-                      </div>
-                      <div className="bracket-status">{renderRealResult(match.id, true)}</div>
+  <span>{match.code}</span>
+  <small>📅 {formatMatchDateTime(match)}</small>
+</div>
+
+{(!match.home || !match.away) && (
+  <div className="bracket-formula">
+    {match.homeRaw} vs {match.awayRaw}
+  </div>
+)}
+
+<div className="team-line">
+  <span>{trTeamLabel(match.home)}</span>
+  <strong>{real?.home_score ?? "-"}</strong>
+</div>
+
+<div className="team-line">
+  <span>{trTeamLabel(match.away)}</span>
+  <strong>{real?.away_score ?? "-"}</strong>
+</div>                      <div className="bracket-status">{renderRealResult(match.id, true)}</div>
                     </div>
                   );
                 })}
