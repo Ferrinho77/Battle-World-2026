@@ -116,27 +116,20 @@ export const knockoutRounds = [
   {
     round: "Sedicesimi",
     matches: [
-      "2A - 2B",
-      "1F - 2C",
-
       "1E - 3ABCDF",
       "1I - 3CDFGH",
-
-      "1C - 2F",
-      "2E - 2I",
-
-      "1A - 3CEFHI",
-      "1L - 3EHIJK",
-
+      "2A - 2B",
+      "1F - 2C",
       "2K - 2L",
       "1H - 2J",
-
       "1D - 3BEFIJ",
       "1G - 3AEHIJ",
-
+      "1C - 2F",
+      "2E - 2I",
+      "1A - 3CEFHI",
+      "1L - 3EHIJK",
       "1J - 2H",
       "2D - 2G",
-
       "1B - 3EFGIJ",
       "1K - 3DEIJL",
     ],
@@ -172,15 +165,11 @@ export const knockoutRounds = [
   },
   {
     round: "Finale 3° posto",
-    matches: [
-      "Perdente SF1 - Perdente SF2",
-    ],
+    matches: ["Perdente SF1 - Perdente SF2"],
   },
   {
     round: "Finale",
-    matches: [
-      "Vincente SF1 - Vincente SF2",
-    ],
+    matches: ["Vincente SF1 - Vincente SF2"],
   },
 ];
 export const topScorers = [
