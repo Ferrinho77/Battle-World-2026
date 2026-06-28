@@ -850,13 +850,17 @@ function getKnockoutKickoff(round, index) {
   return schedule[round]?.[index] || null;
 }
 
-async function loadKnockoutOverrides() {
-  if (!selectedLeague?.id) return;
 
+
+
+
+const GLOBAL_KNOCKOUT_LEAGUE_ID = "GLOBAL";
+
+async function loadKnockoutOverrides() {
   const { data, error } = await supabase
     .from("knockout_overrides")
     .select("match_id, home_team, away_team")
-    .eq("league_id", selectedLeague.id);
+    .eq("league_id", GLOBAL_KNOCKOUT_LEAGUE_ID);
 
   if (error) {
     console.warn("Knockout overrides not available:", error.message);
@@ -875,11 +879,6 @@ async function loadKnockoutOverrides() {
 }
 
 async function saveKnockoutOverride(matchId, home, away) {
-  if (!selectedLeague?.id) {
-    setMessage("Seleziona una lega prima di salvare.");
-    return;
-  }
-
   if (!home || !away) {
     setMessage(t.selectBothTeams || "Seleziona entrambe le squadre prima di salvare.");
     return;
@@ -889,7 +888,7 @@ async function saveKnockoutOverride(matchId, home, away) {
     .from("knockout_overrides")
     .upsert(
       {
-        league_id: selectedLeague.id,
+        league_id: GLOBAL_KNOCKOUT_LEAGUE_ID,
         match_id: matchId,
         home_team: home,
         away_team: away,
@@ -906,6 +905,24 @@ async function saveKnockoutOverride(matchId, home, away) {
   await loadKnockoutOverrides();
   setMessage(t.saved || "Modifica salvata.");
 }
+
+async function clearKnockoutOverride(matchId) {
+  const { error } = await supabase
+    .from("knockout_overrides")
+    .delete()
+    .eq("league_id", GLOBAL_KNOCKOUT_LEAGUE_ID)
+    .eq("match_id", matchId);
+
+  if (error) {
+    setMessage(error.message);
+    return;
+  }
+
+  await loadKnockoutOverrides();
+  setMessage(t.saved || "Modifica salvata.");
+}
+
+
 
 async function clearKnockoutOverride(matchId) {
   if (!selectedLeague?.id) return;
