@@ -854,8 +854,7 @@ function getKnockoutKickoff(round, index) {
 
 
 
-const GLOBAL_KNOCKOUT_LEAGUE_ID = "GLOBAL";
-
+const GLOBAL_KNOCKOUT_LEAGUE_ID = "00000000-0000-0000-0000-000000000000";
 async function loadKnockoutOverrides() {
   const { data, error } = await supabase
     .from("knockout_overrides")
