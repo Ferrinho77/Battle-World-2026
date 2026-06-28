@@ -86,9 +86,7 @@ function App() {
   const [globalAdminsLoading, setGlobalAdminsLoading] = useState(false);
   const [predictionLockModeControl, setPredictionLockModeControl] = useState(() => localStorage.getItem("predictionLockModeControl") || "AUTO");
   const [predictionLockControlLoading, setPredictionLockControlLoading] = useState(false);
-  const [knockoutOverrides, setKnockoutOverrides] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("knockoutOverrides") || "{}"); } catch { return {}; }
-  });
+  const [knockoutOverrides, setKnockoutOverrides] = useState({});
   const [isAdmin, setIsAdmin] = useState(false);
   const [predictions, setPredictions] = useState({});
   const [missingPredictionFields, setMissingPredictionFields] = useState({});
@@ -401,9 +399,16 @@ function renderPlayersRealResultCell(matchId) {
     checkPlayer();
     loadRealResults();
     loadPlayers();
+    loadKnockoutOverrides();
 
     return () => authListener?.subscription?.unsubscribe?.();
   }, []);
+
+useEffect(() => {
+  if (selectedLeague?.id) {
+    loadKnockoutOverrides();
+  }
+}, [selectedLeague?.id]);
 
   useEffect(() => {
     const timer = setInterval(() => setNowTick(new Date()), 1000);
@@ -845,24 +850,80 @@ function getKnockoutKickoff(round, index) {
   return schedule[round]?.[index] || null;
 }
 
-  function saveKnockoutOverride(matchId, home, away) {
-    if (!home || !away) {
-      setMessage(t.selectBothTeams || "Seleziona entrambe le squadre prima di salvare.");
-      return;
-    }
-    const next = { ...knockoutOverrides, [matchId]: { home, away } };
-    setKnockoutOverrides(next);
-    localStorage.setItem("knockoutOverrides", JSON.stringify(next));
-    setMessage(t.saved || "Modifica salvata.");
+async function loadKnockoutOverrides() {
+  if (!selectedLeague?.id) return;
+
+  const { data, error } = await supabase
+    .from("knockout_overrides")
+    .select("match_id, home_team, away_team")
+    .eq("league_id", selectedLeague.id);
+
+  if (error) {
+    console.warn("Knockout overrides not available:", error.message);
+    return;
   }
 
-  function clearKnockoutOverride(matchId) {
-    const next = { ...knockoutOverrides };
-    delete next[matchId];
-    setKnockoutOverrides(next);
-    localStorage.setItem("knockoutOverrides", JSON.stringify(next));
-    setMessage(t.saved || "Modifica salvata.");
+  const next = {};
+  (data || []).forEach((row) => {
+    next[row.match_id] = {
+      home: row.home_team,
+      away: row.away_team,
+    };
+  });
+
+  setKnockoutOverrides(next);
+}
+
+async function saveKnockoutOverride(matchId, home, away) {
+  if (!selectedLeague?.id) {
+    setMessage("Seleziona una lega prima di salvare.");
+    return;
   }
+
+  if (!home || !away) {
+    setMessage(t.selectBothTeams || "Seleziona entrambe le squadre prima di salvare.");
+    return;
+  }
+
+  const { error } = await supabase
+    .from("knockout_overrides")
+    .upsert(
+      {
+        league_id: selectedLeague.id,
+        match_id: matchId,
+        home_team: home,
+        away_team: away,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "league_id,match_id" }
+    );
+
+  if (error) {
+    setMessage(error.message);
+    return;
+  }
+
+  await loadKnockoutOverrides();
+  setMessage(t.saved || "Modifica salvata.");
+}
+
+async function clearKnockoutOverride(matchId) {
+  if (!selectedLeague?.id) return;
+
+  const { error } = await supabase
+    .from("knockout_overrides")
+    .delete()
+    .eq("league_id", selectedLeague.id)
+    .eq("match_id", matchId);
+
+  if (error) {
+    setMessage(error.message);
+    return;
+  }
+
+  await loadKnockoutOverrides();
+  setMessage(t.saved || "Modifica salvata.");
+}
 
   function buildKnockoutMatches() {
     const prefixByRound = {
