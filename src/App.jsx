@@ -968,19 +968,30 @@ async function clearKnockoutOverride(matchId) {
         if (!source) return clean;
         const result = realResults[source.id];
         if (!result?.finished) return clean;
-        if (Number(result.home_score) === Number(result.away_score)) return clean;
-        return Number(result.home_score) > Number(result.away_score) ? source.home : source.away;
+        if (Number(result.home_score) === Number(result.away_score)) {
+  return result.qualified_team || clean;
+}
+return Number(result.home_score) > Number(result.away_score) ? source.home : source.away;
       }
 
       const loser = clean.match(/^Perdente\s+(.+)$/i);
-      if (loser) {
-        const source = codeMap[loser[1].trim()];
-        if (!source) return clean;
-        const result = realResults[source.id];
-        if (!result?.finished) return clean;
-        if (Number(result.home_score) === Number(result.away_score)) return clean;
-        return Number(result.home_score) > Number(result.away_score) ? source.away : source.home;
-      }
+if (loser) {
+  const source = codeMap[loser[1].trim()];
+  if (!source) return clean;
+
+  const result = realResults[source.id];
+  if (!result?.finished) return clean;
+
+  if (Number(result.home_score) === Number(result.away_score)) {
+    if (result.qualified_team === source.home) return source.away;
+    if (result.qualified_team === source.away) return source.home;
+    return clean;
+  }
+
+  return Number(result.home_score) > Number(result.away_score)
+    ? source.away
+    : source.home;
+}
 
       return getQualifiedTeam(clean);
     };
@@ -1019,11 +1030,17 @@ async function clearKnockoutOverride(matchId) {
 
 
   function getWinnerFromMatch(matchId) {
-    const ko = buildKnockoutMatches().find((m) => m.id === matchId);
-    const result = realResults[matchId];
-    if (!ko || !result?.finished || Number(result.home_score) === Number(result.away_score)) return "";
-    return Number(result.home_score) > Number(result.away_score) ? ko.home : ko.away;
+  const ko = buildKnockoutMatches().find((m) => m.id === matchId);
+  const result = realResults[matchId];
+
+  if (!ko || !result?.finished) return "";
+
+  if (Number(result.home_score) === Number(result.away_score)) {
+    return result.qualified_team || "";
   }
+
+  return Number(result.home_score) > Number(result.away_score) ? ko.home : ko.away;
+}
 
   function getLoserFromMatch(matchId) {
     const ko = buildKnockoutMatches().find((m) => m.id === matchId);
