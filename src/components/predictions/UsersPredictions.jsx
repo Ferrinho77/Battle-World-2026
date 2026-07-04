@@ -278,7 +278,7 @@ export default function UsersPredictions({
 
                 <tr>
                   <td className="sticky-col round-name-cell plain-round-cell">
-                    🏆 {t.worldChampion || "Vincente Mondiale"}
+                    🏆 Vincitore
                   </td>
 
                   {filteredPlayers.map((name) => {
