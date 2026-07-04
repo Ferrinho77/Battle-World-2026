@@ -275,6 +275,34 @@ export default function UsersPredictions({
                     })}
                   </tr>
                 ))}
+
+                <tr>
+                  <td className="sticky-col round-name-cell plain-round-cell">
+                    🏆 {t.worldChampion || "Vincente Mondiale"}
+                  </td>
+
+                  {filteredPlayers.map((name) => {
+                    const map = getBonusPredictionMapForPlayer(name);
+                    const champion = map["qualification::champion"];
+
+                    return (
+                      <td key={name}>
+                        {champion ? (
+                          <div
+                            className="mini-chip"
+                            style={{
+                              background: getBonusCellColor("qualification", "champion", champion),
+                            }}
+                          >
+                            {champion}
+                          </div>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
               </tbody>
             </table>
           </div>
